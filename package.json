@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com:Jaid/surf.git"
+    "url": "git+https://github.com/Jaid/surf.git"
   },
   "scripts": {
     "test": "bun test --max-concurrency 1"
