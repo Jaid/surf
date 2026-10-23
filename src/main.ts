@@ -1,5 +1,5 @@
-const surf = () => {
-  return 'surf' // TODO Implement actual functionality
-}
+#!/usr/bin/env bun
+import makeCli from './makeCli.ts'
 
-export default surf
+const cli = makeCli()
+await cli()
