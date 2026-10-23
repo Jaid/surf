@@ -1,8 +1,11 @@
+export const surfTraceCategories = ['surf.console', 'surf.browser_metadata'] as const
+
 export const standardTraceCategories = [
   'blink.user_timing',
   'devtools.timeline',
   'loading',
   'toplevel',
+  ...surfTraceCategories,
 ] as const
 
 export const tracePresets = {
@@ -32,6 +35,7 @@ export const tracePresets = {
     'v8.execute',
     'v8',
     'viz',
+    ...surfTraceCategories,
   ] as const,
   network: [
     'blink.resource',
@@ -47,6 +51,7 @@ export const tracePresets = {
     'network.scheduler',
     'ServiceWorker',
     'v8.execute',
+    ...surfTraceCategories,
   ] as const,
 }
 
@@ -64,4 +69,19 @@ export const resolveTraceCategories = (presets: ReadonlyArray<string> = []): Arr
     return [...standardTraceCategories]
   }
   return [...new Set(presets.flatMap(preset => [...tracePresets[parseTracePreset(preset)]]))]
+}
+
+const knownSurfCategories: ReadonlySet<string> = new Set(surfTraceCategories)
+
+export const splitTraceCategories = (categories: ReadonlyArray<string>) => {
+  for (const category of categories) {
+    if (category.startsWith('surf.') && !knownSurfCategories.has(category)) {
+      throw new Error(`Unknown Surf trace category: ${category}`)
+    }
+  }
+  return {
+    chromiumCategories: [...new Set(categories.filter(category => !category.startsWith('surf.')))],
+    collectConsole: categories.includes('surf.console'),
+    collectBrowserMetadata: categories.includes('surf.browser_metadata'),
+  }
 }

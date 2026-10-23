@@ -144,20 +144,22 @@ The first trace downloads the pinned converter from Perfetto's artifact service.
 
 ### Categories and presets
 
-Without `--trace-preset`, Surf requests only these standard categories:
+Without `--trace-preset`, Surf requests these standard categories (four Chromium categories plus two Surf collectors):
 
 ```text
 blink.user_timing
 devtools.timeline
 loading
 toplevel
+surf.console
+surf.browser_metadata
 ```
 
 They provide user timing marks/measures, the basic DevTools timeline, loading, and top-level task activity, without opting into detailed CPU profiling or GPU diagnostics.
 
 | Preset | Purpose |
 | --- | --- |
-| `webgpu_game` | The original 25-category Surf configuration, unchanged: WebGPU/Dawn, graphics and frame presentation, input latency, V8 CPU profiling, and scheduling. |
+| `webgpu_game` | The original 25 Chromium categories, plus Surf collectors: WebGPU/Dawn, graphics and frame presentation, input latency, V8 CPU profiling, and scheduling. |
 | `network` | Network-stack and resource-loading diagnostics, service workers/cache storage, and JavaScript timeline/stack context for API handling. |
 
 ```powershell
@@ -184,11 +186,24 @@ netlog
 network.scheduler
 ServiceWorker
 v8.execute
+surf.console
+surf.browser_metadata
 ```
 
 Chromium describes `netlog` as network-stack events covering HTTP, TLS, DNS, connections, and sockets in its [category registry](https://chromium.googlesource.com/chromium/src/+/main/base/trace_event/builtin_categories.h). This is a browser trace, **not** a HAR export, packet capture, or complete request/response-body archive. Available events depend on the browser version and workload. The preset does not enable `disabled-by-default-netlog.sensitive`, but traces can still contain URLs and application data; review them before sharing.
 
-Saved metadata records the deduplicated `TracePresets` (empty for the standard list) and the requested `TraceCategories`. Console capture remains unchanged.
+Saved metadata records the deduplicated `TracePresets` (empty for the standard list) and the requested `TraceCategories`. The browser-only subset is recorded as `ChromiumTraceCategories`.
+
+### Surf collector categories
+
+These are Surf categories, not Chromium instrumentation categories. Surf uses them to enable its own collectors and removes them from the `Tracing.start` category filter. Both are explicitly included in the standard list and every preset, and deduplicated when presets are merged.
+
+| Category | Collector |
+| --- | --- |
+| `surf.console` | Selected-page `Runtime.consoleAPICalled` (all console methods, not just `console.log`), `Runtime.exceptionThrown`, and `Log.entryAdded`. |
+| `surf.browser_metadata` | Browser command line and persisted experimental flags/custom values, when discoverable. |
+
+Console records stay in the existing `consoleEvents` array, now tagged with `cat: 'surf.console'`. The 100,000-event cap and dropped-event counter are unchanged. Browser metadata stays in `metadata.CommandLine` and `metadata.BraveFlags`. Core recording metadata (browser/V8 versions, category selection, trace format, data-loss status) is always recorded; it is not a separate optional collector.
 
 ## better taskbar icons
 

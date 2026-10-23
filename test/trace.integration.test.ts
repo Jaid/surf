@@ -7,7 +7,7 @@ import fs from 'fs-extra'
 import {unpack} from 'msgpackr'
 
 import {BrowserSession} from '../src/browser/BrowserSession.ts'
-import {resolveTraceCategories} from '../src/trace/categories.ts'
+import {resolveTraceCategories, splitTraceCategories} from '../src/trace/categories.ts'
 import {recordBrowserTrace} from '../src/trace/recordBrowserTrace.ts'
 import {TraceRecorder} from '../src/trace/TraceRecorder.ts'
 
@@ -33,13 +33,25 @@ integration('records and converts a real Perfetto trace with console events', as
     expect(await recorder.finished).toBe(output)
     expect(await recorder.stop()).toBe(output)
     const trace = unpack(brotliDecompressSync(await fs.readFile(output))) as {
-      consoleEvents: Array<unknown>
-      metadata: {TraceStreamFormat: string}
+      consoleEvents: Array<{cat?: string}>
+      metadata: {
+        ChromiumTraceCategories: Array<string>
+        CommandLine?: string
+        TraceCategories: Array<string>
+        TraceStreamFormat: string
+      }
       traceEvents: Array<unknown>
     }
     expect(trace.traceEvents.length).toBeGreaterThan(0)
     expect(JSON.stringify(trace.consoleEvents)).toContain('surf trace test')
     expect(trace.metadata.TraceStreamFormat).toBe('proto')
+    expect(trace.metadata.TraceCategories).toContain('surf.console')
+    expect(trace.metadata.TraceCategories).toContain('surf.browser_metadata')
+    expect(trace.metadata.ChromiumTraceCategories).toEqual(splitTraceCategories(resolveTraceCategories()).chromiumCategories)
+    expect(trace.consoleEvents.every(event => event.cat === 'surf.console')).toBe(true)
+    if (['linux', 'win32'].includes(process.platform)) {
+      expect(trace.metadata.CommandLine).toBeString()
+    }
     expect(await fs.readdir(folder)).toEqual(['trace.msgpack.br'])
     const duplicate = new TraceRecorder(session.browser, {output})
     await expect(duplicate.start()).rejects.toThrow('overwrite')

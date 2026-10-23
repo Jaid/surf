@@ -11,6 +11,8 @@ const messagePack = new Packr({
   variableMapSize: true,
 })
 export type BrowserConsoleEvent = {
+  // Optional when encoding legacy console records. New recordings always include it.
+  cat?: 'surf.console'
   method: 'Log.entryAdded' | 'Runtime.consoleAPICalled' | 'Runtime.exceptionThrown'
   params: unknown
   sessionId?: string

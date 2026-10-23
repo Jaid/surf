@@ -13,7 +13,7 @@ import {TargetType} from 'puppeteer-core'
 import {integer} from '../browser/options.ts'
 import {defaultCacheFolder, resolvePath} from '../lib/paths.ts'
 import {readBrowserMetadata} from './browserMetadata.ts'
-import {resolveTraceCategories} from './categories.ts'
+import {resolveTraceCategories, splitTraceCategories} from './categories.ts'
 import {encodeTraceJsonAsMessagePack} from './encodeTrace.ts'
 import {convertProtoTraceToJson, ensureTraceconv, perfettoVersion} from './perfetto.ts'
 import {TraceOutput} from './TraceOutput.ts'
@@ -82,6 +82,7 @@ export class TraceRecorder {
     this.initialized = true
     const presets = [...new Set(this.options.tracePreset)]
     const categories = resolveTraceCategories(presets)
+    const selection = splitTraceCategories(categories)
     const buffer = integer(this.options.buffer ?? 4_000_000_000, 'buffer', 1, 2_147_483_647 * 1024)
     this.output = await TraceOutput.create(this.options.output)
     try {
@@ -92,7 +93,7 @@ export class TraceRecorder {
       this.session.on('Tracing.bufferUsage', this.onBuffer)
       const version = await this.session.send('Browser.getVersion')
       this.metadata = {
-        ...await readBrowserMetadata(this.session, this.options.userDataDir === undefined ? undefined : resolvePath(this.options.userDataDir)),
+        ...selection.collectBrowserMetadata ? await readBrowserMetadata(this.session, this.options.userDataDir === undefined ? undefined : resolvePath(this.options.userDataDir)) : {},
         Browser: version.product,
         'V8-Version': version.jsVersion,
         TraceStreamFormat: 'proto',
@@ -100,33 +101,40 @@ export class TraceRecorder {
         ...this.options.metadata,
         TracePresets: presets,
         TraceCategories: categories,
+        ChromiumTraceCategories: selection.chromiumCategories,
       }
-      await this.browser.waitForTarget(target => target.type() === TargetType.PAGE, {timeout: 10_000})
-      for (const target of this.browser.targets()) {
-        if (target.type() !== TargetType.PAGE) {
-          continue
-        }
-        const candidate = await target.createCDPSession()
-        try {
-          const {targetInfo} = await candidate.send('Target.getTargetInfo')
-          if (!this.options.targetId || targetInfo.targetId === this.options.targetId) {
-            this.pageSession = candidate
-            this.metadata.ConsoleTarget = targetInfo
-            break
+      if (selection.collectConsole || this.options.reload || this.options.targetId) {
+        await this.browser.waitForTarget(target => target.type() === TargetType.PAGE, {timeout: 10_000})
+        for (const target of this.browser.targets()) {
+          if (target.type() !== TargetType.PAGE) {
+            continue
           }
-        } finally {
-          if (this.pageSession !== candidate) {
-            await candidate.detach().catch(() => {})
+          const candidate = await target.createCDPSession()
+          try {
+            const {targetInfo} = await candidate.send('Target.getTargetInfo')
+            if (!this.options.targetId || targetInfo.targetId === this.options.targetId) {
+              this.pageSession = candidate
+              if (selection.collectConsole) {
+                this.metadata.ConsoleTarget = targetInfo
+              }
+              break
+            }
+          } finally {
+            if (this.pageSession !== candidate) {
+              await candidate.detach().catch(() => {})
+            }
           }
         }
+        if (!this.pageSession) {
+          throw new Error('No matching page target found for trace console capture/reload.')
+        }
+        if (selection.collectConsole) {
+          this.pageSession.on('Runtime.consoleAPICalled', event => this.capture('Runtime.consoleAPICalled', event))
+          this.pageSession.on('Runtime.exceptionThrown', event => this.capture('Runtime.exceptionThrown', event))
+          this.pageSession.on('Log.entryAdded', event => this.capture('Log.entryAdded', event))
+          await Promise.all([this.pageSession.send('Runtime.enable'), this.pageSession.send('Log.enable')])
+        }
       }
-      if (!this.pageSession) {
-        throw new Error('No matching page target found for trace console capture.')
-      }
-      this.pageSession.on('Runtime.consoleAPICalled', event => this.capture('Runtime.consoleAPICalled', event))
-      this.pageSession.on('Runtime.exceptionThrown', event => this.capture('Runtime.exceptionThrown', event))
-      this.pageSession.on('Log.entryAdded', event => this.capture('Log.entryAdded', event))
-      await Promise.all([this.pageSession.send('Runtime.enable'), this.pageSession.send('Log.enable')])
       await this.session.send('Tracing.start', {
         transferMode: 'ReturnAsStream',
         streamFormat: 'proto',
@@ -135,13 +143,13 @@ export class TraceRecorder {
         traceConfig: {
           recordMode: 'recordUntilFull',
           traceBufferSizeInKb: Math.ceil(buffer / 1024),
-          includedCategories: categories,
+          includedCategories: selection.chromiumCategories,
         },
       })
       this.started = true
       this.capturing = true
       if (this.options.reload) {
-        await this.pageSession.send('Page.reload')
+        await this.pageSession!.send('Page.reload')
       }
       console.error(`Recording ${version.product} → ${this.output.path}`)
       return this
@@ -187,6 +195,7 @@ export class TraceRecorder {
     }
     if (this.consoleEvents.length < 100_000) {
       this.consoleEvents.push({
+        cat: 'surf.console',
         method,
         params,
       })
