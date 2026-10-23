@@ -75,6 +75,14 @@ export const resolveOptions = (options: LaunchOptions = {}) => {
 
 export type ResolvedLaunchOptions = ReturnType<typeof resolveOptions>
 
+export const performanceArguments = (options: ResolvedLaunchOptions) => (options.performance ? [
+  '--force-high-performance-gpu',
+  '--force-gpu-rasterization',
+  '--enable-zero-copy',
+  '--disable-backgrounding-occluded-windows',
+  '--disable-renderer-backgrounding',
+] : [])
+
 export const browserArguments = (options: ResolvedLaunchOptions, userDataDir: string) => [
   '--no-first-run',
   '--no-default-browser-check',
@@ -84,13 +92,7 @@ export const browserArguments = (options: ResolvedLaunchOptions, userDataDir: st
   `--profile-directory=${options.profile}`,
   `--remote-debugging-port=${options.port}`,
   '--remote-debugging-address=127.0.0.1',
-  ...options.performance ? [
-    '--force-high-performance-gpu',
-    '--force-gpu-rasterization',
-    '--enable-zero-copy',
-    '--disable-backgrounding-occluded-windows',
-    '--disable-renderer-backgrounding',
-  ] : [],
+  ...performanceArguments(options),
   ...options.args,
   ...options.kiosk ? ['--kiosk'] : [],
   options.app ? `--app=${options.url}` : options.url,

@@ -7,6 +7,13 @@ bun link
 ```
 
 ```powershell
+# Startup/login app: normal browser profile, no Surf worker
+surf pro.x.com --app --unmanaged
+
+# Same browser/profile as other apps; existing login sessions are reused
+surf "github.com/repos?q=sort%3Aupdated+owner%3Ajaid,jaidlab" --app --unmanaged
+surf discord.com/channels/@me --app --unmanaged --profile profile_jaid
+
 # Coupled browser, disposable profile
 surf example.com
 

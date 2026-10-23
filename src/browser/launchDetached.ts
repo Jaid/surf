@@ -4,6 +4,7 @@ import {join} from 'forward-slash-path'
 import fs from 'fs-extra'
 
 import {StopRequest} from '../lib/StopRequest.ts'
+import {spawnDetached} from '../process/spawnDetached.ts'
 import {resolveOptions} from './options.ts'
 import {resolveExecutable} from './resolveExecutable.ts'
 
@@ -28,23 +29,7 @@ export const launchDetached = async (input: LaunchOptions = {}): Promise<Detache
   using stop = new StopRequest
   try {
     const command = [process.execPath, join(import.meta.dir, 'worker.ts'), folder]
-    if (process.platform === 'win32') {
-      // Break away from terminal/runner Job Objects as well as its console.
-      const {WindowsBackgroundProcessLauncher} = await import('../process/WindowsBackgroundProcessLauncher.ts')
-      const launcher = new WindowsBackgroundProcessLauncher
-      launcher.spawn(command, {
-        cwd: process.cwd(),
-        env: process.env,
-      })
-    } else {
-      const child = Bun.spawn(command, {
-        detached: true,
-        stdin: 'ignore',
-        stdout: 'ignore',
-        stderr: 'ignore',
-      })
-      child.unref()
-    }
+    await spawnDetached(command)
     const deadline = Date.now() + options.timeout + 60_000
     while (Date.now() < deadline && stop.code === undefined) {
       if (await Bun.file(status).exists()) {

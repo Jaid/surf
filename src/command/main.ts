@@ -3,6 +3,7 @@ import type {CommandHandler} from '@clerc/core'
 
 import {BrowserSession} from '../browser/BrowserSession.ts'
 import {launchDetached} from '../browser/launchDetached.ts'
+import {launchUnmanaged, resolveUnmanagedOptions, unmanagedArguments} from '../browser/launchUnmanaged.ts'
 import {browserArguments, integer, resolveOptions} from '../browser/options.ts'
 import {resolveExecutable} from '../browser/resolveExecutable.ts'
 import {resolvePath} from '../lib/paths.ts'
@@ -16,6 +17,9 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     throw new Error('Supply one URL, either positionally or with --url.')
   }
   const traceOutput = flags.trace === undefined ? undefined : resolvePath(flags.trace)
+  if (flags.unmanaged && traceOutput) {
+    throw new Error('--trace cannot be combined with --unmanaged.')
+  }
   if (flags.detached && traceOutput) {
     throw new Error('--trace cannot be combined with --detached. Use surf trace --port <port> to record a detached browser.')
   }
@@ -26,21 +30,27 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     integer(flags.duration, 'duration', 1, 2_147_483_647)
   }
   integer(flags.buffer, 'buffer', 1, 2_147_483_647 * 1024)
-  const options = resolveOptions({
+  const input = {
     ...flags,
     url: flags.url ?? parameters.url,
     args: parameters.browserArguments,
-  })
+  }
+  const options = flags.unmanaged ? resolveUnmanagedOptions(input) : resolveOptions(input)
   if (flags.dump) {
     const executable = await resolveExecutable(options.executableFile)
     console.log(JSON.stringify({
       executable,
-      args: browserArguments(options, options.userDataDir ?? '<temporary-user-data-dir>'),
-      temporary: !options.userDataDir,
-      detached: flags.detached,
+      args: flags.unmanaged ? unmanagedArguments(options, input.port !== undefined) : browserArguments(options, options.userDataDir ?? '<temporary-user-data-dir>'),
+      temporary: !flags.unmanaged && !options.userDataDir,
+      detached: flags.detached || flags.unmanaged,
+      unmanaged: flags.unmanaged,
       betterIcon: options.betterIcon,
       trace: flags.trace,
     }, null, 2))
+    return
+  }
+  if (flags.unmanaged) {
+    console.log(JSON.stringify(await launchUnmanaged(input)))
     return
   }
   if (flags.detached) {

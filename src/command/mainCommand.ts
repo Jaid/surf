@@ -2,7 +2,7 @@ import {defineCommand} from '@clerc/core'
 
 const mainCommand = defineCommand({
   name: '',
-  description: 'Launch a dedicated Chromium browser session',
+  description: 'Launch Chromium windows or managed browser sessions',
   parameters: ['[url]', '--', '[browser arguments...]'],
   flags: {
     url: {
@@ -20,6 +20,11 @@ const mainCommand = defineCommand({
       default: false,
       description: 'Return after startup; a background worker owns cleanup',
     },
+    unmanaged: {
+      type: Boolean,
+      default: false,
+      description: 'Spawn and exit without a worker; uses the browser’s normal data directory unless specified',
+    },
     app: {
       type: Boolean,
       default: false,
@@ -33,7 +38,7 @@ const mainCommand = defineCommand({
     userDataDir: {
       type: String,
       short: 'u',
-      description: 'Existing or new persistent user data directory; omitted means temporary',
+      description: 'Persistent data directory; omitted means temporary, or browser default with --unmanaged',
     },
     profile: {
       type: String,
@@ -47,8 +52,7 @@ const mainCommand = defineCommand({
     },
     port: {
       type: Number,
-      default: 0,
-      description: 'Loopback CDP port; 0 chooses a free port',
+      description: 'Loopback CDP port; managed default 0, unmanaged disabled unless supplied',
     },
     betterIcon: {
       type: Boolean,
@@ -62,7 +66,7 @@ const mainCommand = defineCommand({
     timeout: {
       type: Number,
       default: 30_000,
-      description: 'Browser startup timeout in milliseconds',
+      description: 'Managed browser startup timeout in milliseconds',
     },
     trace: {
       type: String,
