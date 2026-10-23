@@ -1,0 +1,1 @@
+A Bun CLI for dedicated Chromium browser sessions: ordinary windows, chromeless app windows, fullscreen kiosks, persistent or disposable profiles, performance traces, and sharper Windows taskbar icons.

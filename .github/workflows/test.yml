@@ -16,6 +16,8 @@ jobs:
       uses: oven-sh/setup-bun@v2.2.0
     - name: install
       run: bun install --frozen-lockfile
+    - name: readme
+      run: bun run readme && git diff --exit-code -- readme.md
     - name: typecheck
       run: bun run typecheck
     - name: test

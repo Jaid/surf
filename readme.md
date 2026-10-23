@@ -1,8 +1,12 @@
+<center><a href="https://github.com/Jaid/surf/raw/HEAD/license.txt"><img src="https://shieldcn.dev/github/license/Jaid/surf.svg?variant=secondary" alt="License"/></a></center>
+
 # Surf
+
+Launch and supervise Chromium browser sessions, app windows, and performance traces
 
 A Bun CLI for dedicated Chromium browser sessions: ordinary windows, chromeless app windows, fullscreen kiosks, persistent or disposable profiles, performance traces, and sharper Windows taskbar icons.
 
-## Getting started
+## getting started
 
 Requires current Bun and an installed Chromium-family browser (Brave, Chrome, Edge, or Chromium). Surf does not download a browser.
 
@@ -44,7 +48,7 @@ surf localhost:5173 -- --enable-features=OverlayScrollbar --auto-open-devtools-f
 
 Use `--switch=value` for switches with values. Surf rejects passthrough switches that would override its profile, debugging endpoint, or window/lifecycle settings. Arguments are never interpolated into a shell command.
 
-## Lifetime and profiles
+## lifetime and profiles
 
 | Setting | Behavior |
 | --- | --- |
@@ -66,7 +70,7 @@ A successful launch prints one JSON object to stdout with the browser PID, execu
 
 Windows workers break away from the launching console and its Job Object. Detached session status/logs remain under `<cache>/sessions/<id>/`; the browser's temporary data directory is still removed. Completed session directories can be deleted when their logs are no longer needed.
 
-## Browser defaults
+## browser defaults
 
 Surf suppresses first-run/default-browser prompts and disables background mode so closing the final window can end the session. It deliberately avoids Puppeteer's automation argument preset and viewport emulation.
 
@@ -82,7 +86,7 @@ surf localhost:5173 --port 9222 --detached
 
 CDP grants full control over the session. Do not expose its port outside loopback or use it with a profile whose data you do not want local debugging clients to access.
 
-## Tracing
+## tracing
 
 ### Launch and record together
 
@@ -120,7 +124,7 @@ Outputs are always Brotli-compressed MessagePack, not DevTools-loadable JSON. Wi
 
 The first trace downloads the pinned converter from Perfetto's artifact service. Cached executable checksums are verified before reuse. Trace conversion needs temporary disk space for protobuf, JSON, and MessagePack alongside the final file.
 
-## Better taskbar icons
+## better taskbar icons
 
 `--app --better-icon` supports Windows with PowerShell 7 and an HTTP(S) launch URL.
 
@@ -134,7 +138,7 @@ The first trace downloads the pinned converter from Perfetto's artifact service.
 
 Icon failures do not prevent launching. The launch site's icon stays fixed across navigation and theme changes; relaunch to refresh it. Discovery uses unauthenticated HTTP rather than browser cookies or page JavaScript. Existing pinned shortcuts and taskbar grouping can still affect the displayed icon. Multiple matching windows are deliberately rejected.
 
-## Cache
+## cache
 
 Override with `--cache-folder`. Defaults:
 
@@ -144,7 +148,7 @@ Override with `--cache-folder`. Defaults:
 
 Icons, the converter, and detached session logs live here; disposable browser profiles do not.
 
-## Library
+## library
 
 ```ts
 import {launchBrowser, launchDetached, TraceRecorder} from 'surf'
@@ -163,15 +167,13 @@ await session.exited
 
 `launchDetached(options)` resolves to the same launch information plus a log path and leaves the background worker responsible for cleanup. `TraceRecorder` offers `start()`, `stop()`, `finished`, and async disposal for recording an existing Puppeteer browser connection. `recordBrowserTrace(options)` exposes the interactive/timed attach workflow.
 
-## Development
+## development
+
+Maintain README content in `docs/tldw` and package metadata in `package.json`. Do not edit `readme.md` directly. Run `bun run readme` (or `bun tldw`) to regenerate it. CI checks that the generated file is up to date.
 
 The CLI follows `src/main.ts → makeCli.ts → command/mainCommand.ts → command/main.ts`, using Clerc's core and selected plugin packages. Browser ownership, profile cleanup, detached launching, icons, and tracing are separate modules.
 
 ```powershell
-bun test
-bun run typecheck
-bun run lint
-
 # Real headless-browser tests, including trace conversion and detachment
 $env:SURF_TEST_BROWSER = 'C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe'
 bun test
@@ -182,3 +184,39 @@ bun test
 ```
 
 Default tests do not launch a browser or download Perfetto. The native helper compilation test runs on Windows when PowerShell is available. Browser-backed integration tests are opt-in.
+
+### setting up
+
+```sh
+git clone git@github.com:Jaid/surf.git
+cd surf
+bun install
+```
+
+### linting
+
+```sh
+bun run lint
+```
+
+### type checking
+
+```sh
+bun run typecheck
+```
+
+### testing
+
+```sh
+bun run test
+```
+
+## license
+
+[MIT License](https://github.com/Jaid/surf/raw/HEAD/license.txt)<br>
+Copyright © 2026, Jaid \<jaid.jsx@gmail.com> (https://github.com/jaid)
+
+<!--
+readme generated with tldw v9.9.0 from ./docs/tldw
+github.com/Jaid/tldw
+-->
