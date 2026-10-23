@@ -2,6 +2,8 @@ import {expect, test} from 'bun:test'
 
 import {resolve} from 'forward-slash-path'
 
+import {resolveTraceCategories} from '../src/trace/categories.ts'
+
 const cli = async (...args: Array<string>) => {
   const process = Bun.spawn([Bun.argv[0], resolve(import.meta.dir, '../src/main.ts'), ...args], {
     stdout: 'pipe',
@@ -51,6 +53,10 @@ test('invalid inputs fail without launching', async () => {
     ['--app', '--kiosk'],
     ['--trace', 'out.msgpack.br', '--detached'],
     ['--duration', '10'],
+    ['--trace-preset', 'network'],
+    ['--trace', 'out.msgpack.br', '--trace-preset', 'missing'],
+    ['trace', '--trace-preset', 'missing'],
+    ['trace', '--trace-preset'],
     ['--unmanaged', '--trace', 'out.msgpack.br'],
     ['--unmanaged', '--app', '--better-icon'],
     ['--unmanaged', '--port', '-1'],
@@ -100,4 +106,12 @@ test('unmanaged CLI passes an explicitly requested debugging port without manage
   expect(dump.args).toContain('--remote-debugging-port=9223')
   expect(dump.args).not.toContain('--disable-background-mode')
   expect(dump.args.some(arg => arg.startsWith('--user-data-dir='))).toBe(false)
+})
+test('launch-time trace presets replace defaults and merge repeated flags', async () => {
+  for (const presets of [[], ['network'], ['webgpu_game'], ['network', 'webgpu_game', 'network']]) {
+    const result = await cli('--dump', '--executable-file', Bun.argv[0], '--trace', 'trace.msgpack.br', ...presets.flatMap(preset => ['--trace-preset', preset]))
+    expect(result.code).toBe(0)
+    const dump = JSON.parse(result.stdout) as {traceCategories: Array<string>}
+    expect(dump.traceCategories).toEqual(resolveTraceCategories(presets))
+  }
 })

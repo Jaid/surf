@@ -12,6 +12,8 @@ export {resolveExecutable} from './browser/resolveExecutable.ts'
 export const launchBrowser = (options?: import('./browser/options.ts').LaunchOptions) => BrowserSession.launch(options)
 export default launchBrowser
 
+export {resolveTraceCategories, standardTraceCategories, tracePresets} from './trace/categories.ts'
+export type {TracePreset} from './trace/categories.ts'
 export {recordBrowserTrace} from './trace/recordBrowserTrace.ts'
 export {TraceRecorder} from './trace/TraceRecorder.ts'
 export type {TraceOptions} from './trace/TraceRecorder.ts'

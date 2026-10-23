@@ -8,6 +8,7 @@ import {browserArguments, integer, resolveOptions} from '../browser/options.ts'
 import {resolveExecutable} from '../browser/resolveExecutable.ts'
 import {resolvePath} from '../lib/paths.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
+import {resolveTraceCategories} from '../trace/categories.ts'
 import {TraceRecorder} from '../trace/TraceRecorder.ts'
 
 // eslint-disable-next-line typescript/no-misused-promises
@@ -23,6 +24,10 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (flags.detached && traceOutput) {
     throw new Error('--trace cannot be combined with --detached. Use surf trace --port <port> to record a detached browser.')
   }
+  if (!traceOutput && flags.tracePreset.length) {
+    throw new Error('--trace-preset requires --trace.')
+  }
+  const traceCategories = traceOutput ? resolveTraceCategories(flags.tracePreset) : undefined
   if (!traceOutput && (flags.reload || flags.duration !== undefined)) {
     throw new Error('--reload and --duration require --trace.')
   }
@@ -46,6 +51,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       unmanaged: flags.unmanaged,
       betterIcon: options.betterIcon,
       trace: flags.trace,
+      traceCategories,
     }, null, 2))
     return
   }
@@ -69,6 +75,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     if (traceOutput) {
       const recorder = new TraceRecorder(session.browser, {
         output: traceOutput,
+        tracePreset: flags.tracePreset,
         buffer: flags.buffer,
         reload: flags.reload,
         cacheFolder: options.cacheFolder,

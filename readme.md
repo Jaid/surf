@@ -142,6 +142,54 @@ Outputs are always Brotli-compressed MessagePack, not DevTools-loadable JSON. Wi
 
 The first trace downloads the pinned converter from Perfetto's artifact service. Cached executable checksums are verified before reuse. Trace conversion needs temporary disk space for protobuf, JSON, and MessagePack alongside the final file.
 
+### Categories and presets
+
+Without `--trace-preset`, Surf requests only these standard categories:
+
+```text
+blink.user_timing
+devtools.timeline
+loading
+toplevel
+```
+
+They provide user timing marks/measures, the basic DevTools timeline, loading, and top-level task activity, without opting into detailed CPU profiling or GPU diagnostics.
+
+| Preset | Purpose |
+| --- | --- |
+| `webgpu_game` | The original 25-category Surf configuration, unchanged: WebGPU/Dawn, graphics and frame presentation, input latency, V8 CPU profiling, and scheduling. |
+| `network` | Network-stack and resource-loading diagnostics, service workers/cache storage, and JavaScript timeline/stack context for API handling. |
+
+```powershell
+surf localhost:5173 --trace ./game.msgpack.br --trace-preset webgpu_game
+surf trace --port 9222 --trace-preset network
+surf trace --port 9222 --trace-preset webgpu_game --trace-preset network
+```
+
+Supplying any presets **replaces** the standard list. Repeating the flag merges only the selected presets and removes duplicate categories, preserving first-occurrence order. Unknown names are rejected before launching or connecting. On the launch command, `--trace-preset` requires `--trace`. Use `--dump --trace ./trace.msgpack.br` with optional presets to inspect the resolved `traceCategories`.
+
+The `network` preset requests:
+
+```text
+blink.resource
+blink.user_timing
+CacheStorage
+devtools.timeline
+disabled-by-default-devtools.timeline
+disabled-by-default-devtools.timeline.stack
+loading
+net
+net.stream
+netlog
+network.scheduler
+ServiceWorker
+v8.execute
+```
+
+Chromium describes `netlog` as network-stack events covering HTTP, TLS, DNS, connections, and sockets in its [category registry](https://chromium.googlesource.com/chromium/src/+/main/base/trace_event/builtin_categories.h). This is a browser trace, **not** a HAR export, packet capture, or complete request/response-body archive. Available events depend on the browser version and workload. The preset does not enable `disabled-by-default-netlog.sensitive`, but traces can still contain URLs and application data; review them before sharing.
+
+Saved metadata records the deduplicated `TracePresets` (empty for the standard list) and the requested `TraceCategories`. Console capture remains unchanged.
+
 ## better taskbar icons
 
 `--app --better-icon` supports Windows with PowerShell 7 and an HTTP(S) launch URL.
@@ -186,6 +234,8 @@ await session.exited
 `launchDetached(options)` resolves to the same launch information plus a log path and leaves the background worker responsible for cleanup. `TraceRecorder` offers `start()`, `stop()`, `finished`, and async disposal for recording an existing Puppeteer browser connection. `recordBrowserTrace(options)` exposes the interactive/timed attach workflow.
 
 `launchUnmanaged({url, app: true})` is the worker-free alternative for startup apps. It submits the browser launch request and returns `UnmanagedInfo`; it has no session handle or disposal requirement. Without `userDataDir`, the browser chooses its normal data directory. The returned `spawnedPid` may be a short-lived handoff process, not the process hosting the window.
+
+Both `TraceRecorder` and `recordBrowserTrace` accept `tracePreset: ['webgpu_game', 'network']`. Omit it or pass an empty array for standard categories. `TracePreset`, `tracePresets`, `standardTraceCategories`, and `resolveTraceCategories()` are exported for inspecting the hardcoded configuration.
 
 ## development
 

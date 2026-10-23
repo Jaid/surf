@@ -1,5 +1,7 @@
 import {defineCommand} from '@clerc/core'
 
+import {tracePresetFlag} from './tracePresetFlag.ts'
+
 const mainCommand = defineCommand({
   name: '',
   description: 'Launch Chromium windows or managed browser sessions',
@@ -72,6 +74,7 @@ const mainCommand = defineCommand({
       type: String,
       description: 'Record to this .msgpack.br file; Enter saves, Ctrl+C saves and closes',
     },
+    tracePreset: tracePresetFlag,
     buffer: {
       type: Number,
       default: 4_000_000_000,

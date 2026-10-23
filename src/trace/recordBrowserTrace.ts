@@ -4,6 +4,7 @@ import puppeteer from 'puppeteer-core'
 
 import {integer} from '../browser/options.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
+import {resolveTraceCategories} from './categories.ts'
 import {TraceRecorder} from './TraceRecorder.ts'
 
 export const recordBrowserTrace = async (options: TraceOptions & {
@@ -14,6 +15,7 @@ export const recordBrowserTrace = async (options: TraceOptions & {
   if (options.duration !== undefined) {
     integer(options.duration, 'duration', 1, 2_147_483_647)
   }
+  resolveTraceCategories(options.tracePreset)
   using stop = new StopRequest(true)
   const response = await fetch(`http://127.0.0.1:${port}/json/version`, {signal: AbortSignal.timeout(10_000)})
   if (!response.ok) {

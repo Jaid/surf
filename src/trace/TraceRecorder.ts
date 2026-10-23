@@ -1,3 +1,4 @@
+import type {TracePreset} from './categories.ts'
 import type {BrowserConsoleEvent} from './encodeTrace.ts'
 import type {Browser, CDPSession, Protocol} from 'puppeteer-core'
 
@@ -12,7 +13,7 @@ import {TargetType} from 'puppeteer-core'
 import {integer} from '../browser/options.ts'
 import {defaultCacheFolder, resolvePath} from '../lib/paths.ts'
 import {readBrowserMetadata} from './browserMetadata.ts'
-import {categories} from './categories.ts'
+import {resolveTraceCategories} from './categories.ts'
 import {encodeTraceJsonAsMessagePack} from './encodeTrace.ts'
 import {convertProtoTraceToJson, ensureTraceconv, perfettoVersion} from './perfetto.ts'
 import {TraceOutput} from './TraceOutput.ts'
@@ -24,6 +25,7 @@ export type TraceOptions = {
   output?: string
   reload?: boolean
   targetId?: string
+  tracePreset?: ReadonlyArray<TracePreset>
   userDataDir?: string
 }
 
@@ -78,6 +80,8 @@ export class TraceRecorder {
       throw new Error('A trace recorder can only be started once.')
     }
     this.initialized = true
+    const presets = [...new Set(this.options.tracePreset)]
+    const categories = resolveTraceCategories(presets)
     const buffer = integer(this.options.buffer ?? 4_000_000_000, 'buffer', 1, 2_147_483_647 * 1024)
     this.output = await TraceOutput.create(this.options.output)
     try {
@@ -94,6 +98,8 @@ export class TraceRecorder {
         TraceStreamFormat: 'proto',
         Traceconv: perfettoVersion,
         ...this.options.metadata,
+        TracePresets: presets,
+        TraceCategories: categories,
       }
       await this.browser.waitForTarget(target => target.type() === TargetType.PAGE, {timeout: 10_000})
       for (const target of this.browser.targets()) {

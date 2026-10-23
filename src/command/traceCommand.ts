@@ -1,5 +1,7 @@
 import {defineCommand} from '@clerc/core'
 
+import {tracePresetFlag} from './tracePresetFlag.ts'
+
 const traceCommand = defineCommand({
   name: 'trace',
   description: 'Record an existing browser through its loopback CDP endpoint',
@@ -14,6 +16,7 @@ const traceCommand = defineCommand({
       short: 'o',
       description: 'Output .msgpack.br file; otherwise trace.msgpack.br, trace2.msgpack.br, …',
     },
+    tracePreset: tracePresetFlag,
     buffer: {
       type: Number,
       default: 4_000_000_000,
