@@ -8,6 +8,7 @@ import {versionPlugin} from '@clerc/plugin-version'
 
 import packageMetadata from '../package.json'
 import mainCommand from './command/mainCommand.ts'
+import {normalizeTraceArgs} from './command/normalizeTraceArgs.ts'
 import traceCommand from './command/traceCommand.ts'
 
 export default (args?: Array<string>) => {
@@ -24,6 +25,6 @@ export default (args?: Array<string>) => {
     .command(mainCommand)
     .command(traceCommand)
   return async () => {
-    await cli.parse(args)
+    await cli.parse(normalizeTraceArgs(args ?? process.argv.slice(2)))
   }
 }

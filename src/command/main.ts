@@ -1,6 +1,8 @@
 import type mainCommand from './mainCommand.ts'
 import type {CommandHandler} from '@clerc/core'
 
+import {temporaryFile} from 'tempy'
+
 import {BrowserSession} from '../browser/BrowserSession.ts'
 import {launchDetached} from '../browser/launchDetached.ts'
 import {launchUnmanaged, resolveUnmanagedOptions, unmanagedArguments} from '../browser/launchUnmanaged.ts'
@@ -17,7 +19,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (context.rawParsed.parameters.length > 1 || flags.url !== undefined && parameters.url !== undefined) {
     throw new Error('Supply one URL, either positionally or with --url.')
   }
-  const traceOutput = flags.trace === undefined ? undefined : resolvePath(flags.trace)
+  const traceOutput = flags.trace === undefined ? undefined : resolvePath(flags.trace || temporaryFile({extension: 'msgpack.br'}))
   if (flags.unmanaged && traceOutput) {
     throw new Error('--trace cannot be combined with --unmanaged.')
   }
@@ -50,7 +52,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       detached: flags.detached || flags.unmanaged,
       unmanaged: flags.unmanaged,
       betterIcon: options.betterIcon,
-      trace: flags.trace,
+      trace: traceOutput,
       traceCategories,
     }, null, 2))
     return

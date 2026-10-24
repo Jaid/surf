@@ -1,9 +1,14 @@
 ### Launch and record together
 
 ```powershell
+surf localhost:5173 --trace --reload
 surf localhost:5173 --trace ./trace.msgpack.br --reload
 surf localhost:5173 --app --performance --trace ./game.msgpack.br --duration 15000
 ```
+
+Bare `--trace` (or `--trace=`) chooses a unique `tempy.temporaryFile({extension: 'msgpack.br'})` path in the OS temporary directory. The recording and saved-output messages print its full path. Surf retains the completed file after the browser/session closes; normal OS temporary-file cleanup can still remove it later. `--trace <path>` or `--trace=<path>` selects an explicit output, which is never overwritten.
+
+When placing the URL after `--trace`, use `--url` so it is not interpreted as the optional output path; alternatively put the positional URL before `--trace`. `--dump` shows the resolved output path without creating a file. The separate `surf trace` command retains its existing working-directory default when `--output` is omitted.
 
 - Enter saves the trace and leaves the coupled browser open.
 - Ctrl+C saves the trace **before** closing the browser.

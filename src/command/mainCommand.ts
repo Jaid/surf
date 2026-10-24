@@ -72,7 +72,7 @@ const mainCommand = defineCommand({
     },
     trace: {
       type: String,
-      description: 'Record to this .msgpack.br file; Enter saves, Ctrl+C saves and closes',
+      description: 'Record a trace; optional file path, otherwise a unique tempy .msgpack.br file',
     },
     tracePreset: tracePresetFlag,
     buffer: {

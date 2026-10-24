@@ -222,3 +222,43 @@ integration('attach CLI merges repeated trace presets', async () => {
     await fs.remove(folder)
   }
 }, 120_000)
+integration('bare --trace saves to a tempy file and retains the recording after shutdown', async () => {
+  let traceFile: string | undefined
+  try {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, 'fixtures/coupled.ts'), 'trace', JSON.stringify([
+      '--url',
+      'about:blank',
+      '--executable-file',
+      executableFile!,
+      '--buffer',
+      '16000000',
+      '--trace-preset',
+      'webgpu_game',
+      '--trace',
+      '--',
+      '--headless=new',
+    ])], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 90_000,
+    })
+    const stdout = new Response(child.stdout)
+    const stderr = new Response(child.stderr)
+    const [code, output, errors] = await Promise.all([child.exited, stdout.text(), stderr.text()])
+    traceFile = /Recording [^\n]+ → ([^\n\r]+)/u.exec(errors)?.[1]
+    expect(code).toBe(130)
+    expect(traceFile).toBeDefined()
+    expect(errors).toContain(`Saved ${traceFile}`)
+    expect(traceFile!.startsWith(`${tmpdir().replaceAll('\\', '/')}/`)).toBe(true)
+    expect(traceFile).toEndWith('.msgpack.br')
+    const trace = unpack(brotliDecompressSync(await fs.readFile(traceFile!))) as {traceEvents: Array<unknown>}
+    expect(trace.traceEvents.length).toBeGreaterThan(0)
+    expect(await fs.pathExists(`${traceFile}.lock`)).toBe(false)
+    const info = JSON.parse(output) as {userDataDir: string}
+    expect(await fs.pathExists(info.userDataDir)).toBe(false)
+  } finally {
+    if (traceFile) {
+      await fs.rm(traceFile, {force: true})
+    }
+  }
+}, 120_000)

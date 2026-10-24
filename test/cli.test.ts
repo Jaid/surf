@@ -1,4 +1,5 @@
 import {expect, test} from 'bun:test'
+import {tmpdir} from 'node:os'
 
 import {resolve} from 'forward-slash-path'
 
@@ -52,6 +53,8 @@ test('invalid inputs fail without launching', async () => {
     ['--port', 'nan'],
     ['--app', '--kiosk'],
     ['--trace', 'out.msgpack.br', '--detached'],
+    ['--trace', '--detached'],
+    ['--trace', '--unmanaged'],
     ['--duration', '10'],
     ['--trace-preset', 'network'],
     ['--trace', 'out.msgpack.br', '--trace-preset', 'missing'],
@@ -60,7 +63,6 @@ test('invalid inputs fail without launching', async () => {
     ['--unmanaged', '--trace', 'out.msgpack.br'],
     ['--unmanaged', '--app', '--better-icon'],
     ['--unmanaged', '--port', '-1'],
-    ['--trace', ''],
     ['--', '--user-data-dir=elsewhere'],
     ['trace', 'unexpected'],
     ['trace', '--duration', '0'],
@@ -114,4 +116,23 @@ test('launch-time trace presets replace defaults and merge repeated flags', asyn
     const dump = JSON.parse(result.stdout) as {traceCategories: Array<string>}
     expect(dump.traceCategories).toEqual(resolveTraceCategories(presets))
   }
+})
+test('trace accepts an omitted output before flags, at the end, and before browser passthrough', async () => {
+  const paths = new Set<string>
+  for (const args of [['--trace'], ['--trace', '--app'], ['--trace', '--trace-preset', 'webgpu_game'], ['--trace', '--', '--headless=new'], ['--trace='], ['--trace', '']]) {
+    const result = await cli('--dump', '--executable-file', Bun.argv[0], '--url', 'https://example.com', ...args)
+    expect(result.code).toBe(0)
+    const dump = JSON.parse(result.stdout) as {
+      args: Array<string>
+      trace: string
+    }
+    expect(dump.trace).toEndWith('.msgpack.br')
+    expect(await Bun.file(dump.trace).exists()).toBe(false)
+    expect(dump.trace.startsWith(`${resolve(tmpdir()).replaceAll('\\', '/')}/`)).toBe(true)
+    paths.add(dump.trace)
+    if (args.includes('--')) {
+      expect(dump.args).toContain('--headless=new')
+    }
+  }
+  expect(paths.size).toBe(6)
 })
