@@ -166,3 +166,15 @@ test('manual tracing without a terminal fails before launching', async () => {
   expect(result.stderr).toContain('interactive terminal')
   expect(result.stdout).toBe('')
 })
+test('dump resolves both trace filenames from either extension or a stem', async () => {
+  for (const suffix of ['', '.msgpack.br', '.pftrace.br']) {
+    const result = await cli('--dump', '--executable-file', Bun.argv[0], '--trace', `pair${suffix}`)
+    expect(result.code).toBe(0)
+    const dump = JSON.parse(result.stdout) as {
+      trace: string
+      tracePerfetto: string
+    }
+    expect(dump.trace).toBe(resolve('pair.msgpack.br'))
+    expect(dump.tracePerfetto).toBe(resolve('pair.pftrace.br'))
+  }
+})

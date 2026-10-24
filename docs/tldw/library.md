@@ -20,3 +20,5 @@ await session.exited
 Both `TraceRecorder` and `recordBrowserTrace` accept `tracePreset: ['webgpu_game', 'network']`. Omit it or pass an empty array for standard categories. `TracePreset`, `tracePresets`, `standardTraceCategories`, and `resolveTraceCategories()` are exported for inspecting the hardcoded configuration.
 
 Both recording APIs accept repeatable category overrides as arrays: `traceCategory` and `traceExclude`. `resolveTraceCategories(presets, additions, exclusions)` exposes the same resolution rules. `recordBrowserTrace` additionally accepts `traceStart: 'manual'` and `traceDelay` in milliseconds (type `TraceStartOptions`). It returns the saved path, or `undefined` when cancelled before recording; interruption sets `process.exitCode`.
+
+Recordings now produce a native `.pftrace.br` and a versioned `.msgpack.br` sidecar. The saved/finished return value remains the sidecar path. `traceOutputPaths(output)` resolves `{path, perfettoPath}` from a stem or either filename. `TraceSidecar` and `BrowserConsoleEvent` are exported for consumers. The obsolete recording `cacheFolder` option was removed.

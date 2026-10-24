@@ -1,26 +1,23 @@
 import type {TracePreset} from './categories.ts'
-import type {BrowserConsoleEvent} from './encodeTrace.ts'
+import type {BrowserConsoleEvent} from './writeTracePair.ts'
 import type {Browser, CDPSession, Protocol} from 'puppeteer-core'
 
-import {createReadStream, createWriteStream} from 'node:fs'
+import {createWriteStream} from 'node:fs'
 import {Readable} from 'node:stream'
 import {pipeline} from 'node:stream/promises'
-import {constants, createBrotliCompress, createGunzip} from 'node:zlib'
+import {createGunzip} from 'node:zlib'
 
-import {join} from 'forward-slash-path'
 import {TargetType} from 'puppeteer-core'
 
 import {integer} from '../browser/options.ts'
-import {defaultCacheFolder, resolvePath} from '../lib/paths.ts'
+import {resolvePath} from '../lib/paths.ts'
 import {readBrowserMetadata} from './browserMetadata.ts'
 import {resolveTraceCategories, splitTraceCategories} from './categories.ts'
-import {encodeTraceJsonAsMessagePack} from './encodeTrace.ts'
-import {convertProtoTraceToJson, ensureTraceconv, perfettoVersion} from './perfetto.ts'
 import {TraceOutput} from './TraceOutput.ts'
+import {writeTracePair} from './writeTracePair.ts'
 
 export type TraceOptions = {
   buffer?: number
-  cacheFolder?: string
   metadata?: Record<string, unknown>
   output?: string
   reload?: boolean
@@ -64,8 +61,8 @@ export class TraceRecorder {
   private session?: CDPSession
 
   private started = false
+  private startedAt?: string
   private stopping?: Promise<string>
-  private traceconv = ''
 
   constructor(readonly browser: Browser, readonly options: TraceOptions = {}) {
     const {promise, resolve, reject} = Promise.withResolvers<string>()
@@ -88,7 +85,6 @@ export class TraceRecorder {
     const buffer = integer(this.options.buffer ?? 4_000_000_000, 'buffer', 1, 2_147_483_647 * 1024)
     this.output = await TraceOutput.create(this.options.output)
     try {
-      this.traceconv = await ensureTraceconv(join(resolvePath(this.options.cacheFolder ?? defaultCacheFolder()), 'perfetto'))
       this.session = await this.browser.target().createCDPSession()
       this.browser.on('disconnected', this.onDisconnect)
       this.session.on('Tracing.tracingComplete', this.onComplete)
@@ -99,7 +95,6 @@ export class TraceRecorder {
         Browser: version.product,
         'V8-Version': version.jsVersion,
         TraceStreamFormat: 'proto',
-        Traceconv: perfettoVersion,
         ...this.options.metadata,
         TracePresets: presets,
         TraceCategories: categories,
@@ -137,6 +132,8 @@ export class TraceRecorder {
           await Promise.all([this.pageSession.send('Runtime.enable'), this.pageSession.send('Log.enable')])
         }
       }
+      const startedAt = new Date
+      this.startedAt = startedAt.toISOString()
       await this.session.send('Tracing.start', {
         transferMode: 'ReturnAsStream',
         streamFormat: 'proto',
@@ -225,9 +222,7 @@ export class TraceRecorder {
     this.capturing = false
     const session = this.session
     const proto = this.output.temporary('pftrace')
-    const json = this.output.temporary('json')
-    const messagePack = this.output.temporary('msgpack')
-    const compressed = this.output.temporary('br')
+    const stoppedAt = new Date
     let stream: string | undefined
     try {
       await session.send('Tracing.end')
@@ -257,21 +252,15 @@ export class TraceRecorder {
       }
       await pipeline(Readable.from(chunks()), createGunzip(), createWriteStream(proto))
       this.downloaded = true
-      await convertProtoTraceToJson(this.traceconv, proto, json)
-      const eventCount = await encodeTraceJsonAsMessagePack(json, messagePack, this.consoleEvents, {
+      await writeTracePair(proto, this.output, this.consoleEvents, {
         ...this.metadata,
+        RecordingId: crypto.randomUUID(),
+        RecordingStartedAt: this.startedAt,
+        RecordingStoppedAt: stoppedAt.toISOString(),
         TraceDataLossOccurred: event.dataLossOccurred,
         DroppedConsoleEvents: this.droppedConsoleEvents,
       })
-      if (!eventCount) {
-        throw new Error('The browser returned no trace events.')
-      }
-      await pipeline(createReadStream(messagePack), createBrotliCompress({
-        params: {[constants.BROTLI_PARAM_QUALITY]: 6},
-      }), createWriteStream(compressed))
-      // Atomic, no-clobber publication, even if another writer ignores our lock.
-      await this.output.publish(compressed)
-      console.error(`Saved ${this.output.path} (${eventCount.toLocaleString()} trace events)`)
+      console.error(`Saved ${this.output.path} + ${this.output.perfettoPath}`)
       return this.output.path
     } finally {
       if (stream) {

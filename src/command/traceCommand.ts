@@ -15,7 +15,7 @@ const traceCommand = defineCommand({
     output: {
       type: String,
       short: 'o',
-      description: 'Output .msgpack.br file; otherwise trace.msgpack.br, trace2.msgpack.br, …',
+      description: 'Output stem or .msgpack.br/.pftrace.br path; otherwise numbered trace pairs',
     },
     tracePreset: tracePresetFlag,
     ...traceControlFlags,
@@ -40,10 +40,6 @@ const traceCommand = defineCommand({
     userDataDir: {
       type: String,
       description: 'Read persisted experimental flags from this directory for metadata',
-    },
-    cacheFolder: {
-      type: String,
-      description: 'Cache directory for the verified traceconv download',
     },
   },
 // eslint-disable-next-line typescript/no-misused-promises

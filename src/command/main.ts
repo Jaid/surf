@@ -8,9 +8,9 @@ import {launchDetached} from '../browser/launchDetached.ts'
 import {launchUnmanaged, resolveUnmanagedOptions, unmanagedArguments} from '../browser/launchUnmanaged.ts'
 import {browserArguments, integer, resolveOptions} from '../browser/options.ts'
 import {resolveExecutable} from '../browser/resolveExecutable.ts'
-import {resolvePath} from '../lib/paths.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
 import {resolveTraceCategories} from '../trace/categories.ts'
+import {traceOutputPaths} from '../trace/TraceOutput.ts'
 import {TraceRecorder} from '../trace/TraceRecorder.ts'
 import {requireTraceInput, validateTraceStart, waitForTraceStart} from '../trace/waitForTraceStart.ts'
 
@@ -20,7 +20,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (context.rawParsed.parameters.length > 1 || flags.url !== undefined && parameters.url !== undefined) {
     throw new Error('Supply one URL, either positionally or with --url.')
   }
-  const traceOutput = flags.trace === undefined ? undefined : resolvePath(flags.trace || temporaryFile({extension: 'msgpack.br'}))
+  const traceOutput = flags.trace === undefined ? undefined : traceOutputPaths(flags.trace || temporaryFile({extension: 'msgpack.br'})).path
   if (flags.unmanaged && traceOutput) {
     throw new Error('--trace cannot be combined with --unmanaged.')
   }
@@ -58,6 +58,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       unmanaged: flags.unmanaged,
       betterIcon: options.betterIcon,
       trace: traceOutput,
+      tracePerfetto: traceOutput ? traceOutputPaths(traceOutput).perfettoPath : undefined,
       traceCategories,
       traceStart: traceOutput ? flags.traceStart ?? 'immediate' : undefined,
       traceDelay: traceOutput ? flags.traceDelay ?? 0 : undefined,
@@ -96,7 +97,6 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
         traceExclude: flags.traceExclude,
         buffer: flags.buffer,
         reload: flags.reload,
-        cacheFolder: options.cacheFolder,
         userDataDir: session.userData.path,
         metadata: {SurfArguments: [session.executable, ...session.args]},
       })

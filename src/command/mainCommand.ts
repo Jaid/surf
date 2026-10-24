@@ -64,7 +64,7 @@ const mainCommand = defineCommand({
     },
     cacheFolder: {
       type: String,
-      description: 'Cache for icons, traceconv, and detached session logs',
+      description: 'Cache for icons and detached session logs',
     },
     timeout: {
       type: Number,
@@ -73,7 +73,7 @@ const mainCommand = defineCommand({
     },
     trace: {
       type: String,
-      description: 'Record a trace; optional file path, otherwise a unique tempy .msgpack.br file',
+      description: 'Record a .pftrace.br + .msgpack.br pair; optional path/stem, otherwise tempy',
     },
     tracePreset: tracePresetFlag,
     ...traceControlFlags,

@@ -6,7 +6,7 @@ surf localhost:5173 --trace ./trace.msgpack.br --reload
 surf localhost:5173 --app --performance --trace ./game.msgpack.br --duration 15000
 ```
 
-Bare `--trace` (or `--trace=`) chooses a unique `tempy.temporaryFile({extension: 'msgpack.br'})` path in the OS temporary directory. The recording and saved-output messages print its full path. Surf retains the completed file after the browser/session closes; normal OS temporary-file cleanup can still remove it later. `--trace <path>` or `--trace=<path>` selects an explicit output, which is never overwritten.
+Bare `--trace` (or `--trace=`) chooses a unique `tempy.temporaryFile({extension: 'msgpack.br'})` path in the OS temporary directory. The recording and saved-output messages print its full path. Surf retains both completed files after the browser/session closes; normal OS temporary-file cleanup can still remove it later. `--trace <path>` or `--trace=<path>` selects an explicit output stem or either pair filename; neither member is ever overwritten.
 
 When placing the URL after `--trace`, use `--url` so it is not interpreted as the optional output path; alternatively put the positional URL before `--trace`. `--dump` shows the resolved output path without creating a file. The separate `surf trace` command retains its existing working-directory default when `--output` is omitted.
 
@@ -27,17 +27,50 @@ surf trace --port 9222 --output ./trace.msgpack.br --duration 10000 --reload
 
 The trace is browser-wide. Console events and optional reload belong to the first page target, or the page selected with `surf trace --target-id <id>`. The default trace buffer is 4,000,000,000 bytes; change it with `--buffer`.
 
-The large-trace pipeline from `recordBrowserTrace.ts` is retained:
+### Two-file trace format
 
-1. CDP streams gzip-compressed Perfetto protobuf rather than the browser's size-limited JSON export.
-2. SHA-256-verified, pinned Perfetto `traceconv v58.2` converts it to Chrome JSON events.
-3. Events are encoded incrementally as MessagePack and compressed with Brotli.
+Each recording produces:
 
-Files contain `traceEvents`, `consoleEvents`, and metadata, including browser/V8 versions, experimental flags when readable, trace data loss, and dropped console event counts. Console capture is capped at 100,000 events. Windows and Linux command lines are discovered automatically; `surf trace --user-data-dir` can explicitly select the profile whose experimental flags are recorded.
+- **`<name>.pftrace.br`**: the original Perfetto protobuf, Brotli-compressed without conversion.
+- **`<name>.msgpack.br`**: Surf's console events and metadata in a versioned MessagePack/Brotli sidecar. This replaces the old combined format: the sidecar has **no `traceEvents` array**.
 
-Outputs are always Brotli-compressed MessagePack, not DevTools-loadable JSON. Without `--output`, the attach command chooses `trace.msgpack.br`, `trace2.msgpack.br`, etc. in the working directory. Explicit outputs are never overwritten. Reservation locks and partial files are removed on normal success/failure; after a hard crash, remove stale `.lock`/`.partial` files only when the recorder is no longer running.
+Surf downloads CDP's gzip stream to a temporary protobuf file, then compresses both outputs concurrently at Brotli quality 6. Console entries are encoded incrementally. No traceconv download/execution or intermediate JSON/MessagePack files are needed at runtime.
 
-The first trace downloads the pinned converter from Perfetto's artifact service. Cached executable checksums are verified before reuse. Trace conversion needs temporary disk space for protobuf, JSON, and MessagePack alongside the final file.
+The sidecar schema is exported as `TraceSidecar`:
+
+```ts
+{
+  formatVersion: 1,
+  consoleEvents: [...],
+  metadata: {
+    RecordingId: 'UUID',
+    RecordingStartedAt: 'UTC ISO timestamp',
+    RecordingStoppedAt: 'UTC ISO timestamp',
+    // Browser/V8 versions, categories, collector metadata,
+    // TraceDataLossOccurred, DroppedConsoleEvents, …
+  },
+  perfetto: {
+    file: 'game.pftrace.br', // sibling filename
+    compression: 'brotli',
+    sha256: '...', // SHA-256 of the DECOMPRESSED protobuf
+    uncompressedBytes: 123456,
+  },
+}
+```
+
+The UUID lives in the sidecar; Surf leaves the protobuf untouched. The hash links the sidecar to its exact native trace and detects accidental mismatches. Keep both files together. The sidecar's final descriptor waits for Perfetto compression to finish, while console encoding/compression runs concurrently.
+
+Recording timestamps are wall-clock bounds sampled before requesting capture start/stop, not substitutes for Perfetto's native clock snapshots. CDP console parameters retain their original timestamps. Console capture remains capped at 100,000 events. Windows/Linux command lines are discovered automatically; `surf trace --user-data-dir` can select the profile whose experimental flags are recorded.
+
+An output stem (`game`) or either filename (`game.msgpack.br`, `game.pftrace.br`) selects the same pair. Without `--output`, attachment chooses `trace.*`, `trace2.*`, etc., skipping pairs with either existing member or a reservation. Bare launch-time `--trace` still uses tempy.
+
+Both files finish writing before publication. Each file is published atomically without overwriting; the pair cannot be atomic. Perfetto is published first, then the **sidecar last as the completion marker**. If the second publication fails, Surf rolls back its newly published Perfetto file. Normal failures remove locks/partials. A hard crash can leave an orphaned Perfetto file or stale `.lock`/`.partial` files; remove them only after confirming the recorder is no longer running.
+
+Library `stop()`/`finished` and `recordBrowserTrace()` still return the **sidecar path**, after both files are published. Exported `traceOutputPaths(pathOrStem)` returns `{path, perfettoPath}`; `path` is the sidecar. `--dump` reports both as `trace` and `tracePerfetto`.
+
+Decompress `.pftrace.br` to `.pftrace` before opening it in Perfetto UI. Surf's sidecar is not automatically loaded into that UI. Temporary disk space is needed for the raw protobuf and compressed outputs, but not converted JSON.
+
+The attachment CLI's `--cache-folder` and recording library's `cacheFolder` option were removed with traceconv. Launch-time `--cache-folder` remains for icons and detached-session logs. Surf no longer counts decoded browser events; empty native streams fail, and nonempty protobuf is preserved without conversion.
 
 ### Categories and presets
 

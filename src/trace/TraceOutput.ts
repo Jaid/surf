@@ -3,9 +3,18 @@ import fs from 'fs-extra'
 
 import {resolvePath} from '../lib/paths.ts'
 
+export const traceOutputPaths = (output: string) => {
+  const resolved = resolvePath(output)
+  const stem = resolved.replace(/\.(?:msgpack|pftrace)\.br$/iu, '')
+  return {
+    path: `${stem}.msgpack.br`,
+    perfettoPath: `${stem}.pftrace.br`,
+  }
+}
+
 export class TraceOutput {
   static async create(output?: string) {
-    const requested = output === undefined ? undefined : resolvePath(output)
+    const requested = output === undefined ? undefined : traceOutputPaths(output).path
     const base = requested ?? resolvePath('trace.msgpack.br')
     await fs.mkdir(dirname(base), {recursive: true})
     for (let index = 1; ; index++) {
@@ -20,7 +29,7 @@ export class TraceOutput {
         throw new Error(`Cannot reserve trace output: ${path}`, {cause: error})
       }
       try {
-        if (await fs.pathExists(path)) {
+        if (await fs.pathExists(path) || await fs.pathExists(traceOutputPaths(path).perfettoPath)) {
           if (requested) {
             throw new Error(`Refusing to overwrite trace: ${path}`)
           }
@@ -34,16 +43,27 @@ export class TraceOutput {
       }
     }
   }
+  readonly perfettoPath: string
   private disposed = false
+
   private readonly partials = new Set<string>
 
   private readonly prefix = crypto.randomUUID()
 
-  private constructor(readonly path: string, private readonly lock: string) {}
+  private constructor(readonly path: string, private readonly lock: string) {
+    this.perfettoPath = traceOutputPaths(path).perfettoPath
+  }
 
-  async publish(source: string) {
-    // Atomic no-clobber publication, including writers that ignore the lock.
-    await fs.link(source, this.path)
+  async publish(perfetto: string, sidecar: string) {
+    // Each link is atomic and no-clobber, but the pair cannot be atomic.
+    // Publish the completion marker last; roll back only our own first link.
+    await fs.link(perfetto, this.perfettoPath)
+    try {
+      await fs.link(sidecar, this.path)
+    } catch (error) {
+      await fs.rm(this.perfettoPath, {force: true})
+      throw error
+    }
   }
 
   async [Symbol.asyncDispose]() {
