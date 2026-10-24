@@ -12,6 +12,7 @@ import {resolvePath} from '../lib/paths.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
 import {resolveTraceCategories} from '../trace/categories.ts'
 import {TraceRecorder} from '../trace/TraceRecorder.ts'
+import {requireTraceInput, validateTraceStart, waitForTraceStart} from '../trace/waitForTraceStart.ts'
 
 // eslint-disable-next-line typescript/no-misused-promises
 export const run: CommandHandler<typeof mainCommand> = async context => {
@@ -29,7 +30,11 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (!traceOutput && flags.tracePreset.length) {
     throw new Error('--trace-preset requires --trace.')
   }
-  const traceCategories = traceOutput ? resolveTraceCategories(flags.tracePreset) : undefined
+  if (!traceOutput && (flags.traceCategory.length || flags.traceExclude.length || flags.traceStart !== undefined || flags.traceDelay !== undefined || flags.exitAfterTrace)) {
+    throw new Error('Trace category, start, delay, and exit options require --trace.')
+  }
+  validateTraceStart(flags)
+  const traceCategories = traceOutput ? resolveTraceCategories(flags.tracePreset, flags.traceCategory, flags.traceExclude) : undefined
   if (!traceOutput && (flags.reload || flags.duration !== undefined)) {
     throw new Error('--reload and --duration require --trace.')
   }
@@ -54,6 +59,9 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       betterIcon: options.betterIcon,
       trace: traceOutput,
       traceCategories,
+      traceStart: traceOutput ? flags.traceStart ?? 'immediate' : undefined,
+      traceDelay: traceOutput ? flags.traceDelay ?? 0 : undefined,
+      exitAfterTrace: flags.exitAfterTrace,
     }, null, 2))
     return
   }
@@ -65,6 +73,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     console.log(JSON.stringify(await launchDetached(options)))
     return
   }
+  requireTraceInput(flags)
   using stop = new StopRequest
   await using session = await BrowserSession.launch(options)
   console.log(JSON.stringify(session.info))
@@ -75,9 +84,16 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     if (traceOutput) {
+      const cancelled = await waitForTraceStart(flags, Promise.race([session.exited, stop.promise]))
+      if (cancelled !== undefined) {
+        process.exitCode = cancelled
+        return
+      }
       const recorder = new TraceRecorder(session.browser, {
         output: traceOutput,
         tracePreset: flags.tracePreset,
+        traceCategory: flags.traceCategory,
+        traceExclude: flags.traceExclude,
         buffer: flags.buffer,
         reload: flags.reload,
         cacheFolder: options.cacheFolder,
@@ -100,7 +116,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
           void recorder.stop().catch(() => {})
         }, flags.duration)
       }
-      console.error('Press Enter to save the trace, or Ctrl+C to save and close the browser.')
+      console.error(flags.exitAfterTrace ? 'Press Enter or Ctrl+C to save the trace and close the browser.' : 'Press Enter to save the trace, or Ctrl+C to save and close the browser.')
       try {
         const result = await Promise.race([
           session.exited.then(code => ({code})),
@@ -108,6 +124,9 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
           recorder.finished.then(() => {}),
         ])
         await recorder.stop()
+        if (flags.exitAfterTrace && !result) {
+          return
+        }
         if (result) {
           process.exitCode = result.code
           return

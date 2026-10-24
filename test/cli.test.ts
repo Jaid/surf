@@ -56,6 +56,16 @@ test('invalid inputs fail without launching', async () => {
     ['--trace', '--detached'],
     ['--trace', '--unmanaged'],
     ['--duration', '10'],
+    ['--trace-category', 'gpu'],
+    ['--trace-exclude', 'surf.console'],
+    ['--trace-start', 'manual'],
+    ['--trace-delay', '0'],
+    ['--exit-after-trace'],
+    ['--trace', '--trace-start', 'invalid'],
+    ['--trace', '--trace-delay', '-1'],
+    ['trace', '--trace-delay', '-1'],
+    ['trace', '--exit-after-trace'],
+    ['--trace', '--trace-category', 'surf.typo'],
     ['--trace-preset', 'network'],
     ['--trace', 'out.msgpack.br', '--trace-preset', 'missing'],
     ['trace', '--trace-preset', 'missing'],
@@ -135,4 +145,24 @@ test('trace accepts an omitted output before flags, at the end, and before brows
     }
   }
   expect(paths.size).toBe(6)
+})
+test('trace overrides and lifecycle controls appear in the launch plan', async () => {
+  const result = await cli('--dump', '--executable-file', Bun.argv[0], '--trace', '--trace-preset', 'network', '--trace-category', 'gpu', '--trace-category', 'blink.console', '--trace-exclude', 'surf.console', '--trace-exclude', 'netlog', '--trace-start', 'manual', '--trace-delay', '5000', '--exit-after-trace')
+  expect(result.code).toBe(0)
+  const dump = JSON.parse(result.stdout) as {
+    exitAfterTrace: boolean
+    traceCategories: Array<string>
+    traceDelay: number
+    traceStart: string
+  }
+  expect(dump.traceCategories).toEqual(resolveTraceCategories(['network'], ['gpu', 'blink.console'], ['surf.console', 'netlog']))
+  expect(dump.traceStart).toBe('manual')
+  expect(dump.traceDelay).toBe(5000)
+  expect(dump.exitAfterTrace).toBe(true)
+})
+test('manual tracing without a terminal fails before launching', async () => {
+  const result = await cli('--executable-file', Bun.argv[0], '--trace', '--trace-start', 'manual')
+  expect(result.code).not.toBe(0)
+  expect(result.stderr).toContain('interactive terminal')
+  expect(result.stdout).toBe('')
 })

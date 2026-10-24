@@ -76,7 +76,7 @@ integration('standalone timed recording disconnects without closing the browser'
       output: join(folder, 'trace.msgpack.br'),
       buffer: 16_000_000,
     })
-    expect(await Bun.file(output).exists()).toBe(true)
+    expect(await Bun.file(output!).exists()).toBe(true)
     expect(session.browser.connected).toBe(true)
   } finally {
     await fs.remove(folder)
@@ -262,3 +262,67 @@ integration('bare --trace saves to a tempy file and retains the recording after 
     }
   }
 }, 120_000)
+for (const mode of ['delayed', 'manual', 'cancel-manual', 'cancel-delay']) {
+  integration(`trace start lifecycle: ${mode}`, async () => {
+    const folder = await fs.mkdtemp(join(tmpdir(), 'surf-trace-start-'))
+    try {
+      const outputFile = join(folder, 'trace.msgpack.br')
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, 'fixtures/coupled.ts'), mode, JSON.stringify([
+        'about:blank',
+        '--executable-file',
+        executableFile!,
+        '--trace',
+        outputFile,
+        '--buffer',
+        '16000000',
+        '--duration',
+        '100',
+        '--exit-after-trace',
+        '--trace-exclude',
+        'surf.console',
+        '--trace-exclude',
+        'surf.browser_metadata',
+        '--trace-category',
+        'netlog',
+        ...mode.includes('manual') ? ['--trace-start', 'manual'] : [],
+        '--trace-delay',
+        mode === 'cancel-delay' ? '60000' : '100',
+        '--',
+        '--headless=new',
+      ])], {
+        stdout: 'pipe',
+        stderr: 'pipe',
+        timeout: 90_000,
+      })
+      const stdout = new Response(child.stdout)
+      const stderr = new Response(child.stderr)
+      const [code, output, errors] = await Promise.all([child.exited, stdout.text(), stderr.text()])
+      const cancelled = mode.startsWith('cancel-')
+      expect(code).toBe(cancelled ? 130 : 0)
+      const info = JSON.parse(output) as {userDataDir: string}
+      expect(await fs.pathExists(info.userDataDir)).toBe(false)
+      if (cancelled) {
+        expect(errors).not.toContain('Recording ')
+        expect(await fs.readdir(folder)).toEqual([])
+      } else {
+        expect(errors).toContain('Waiting 100 ms')
+        expect(errors).toContain('Saved ')
+        const trace = unpack(brotliDecompressSync(await fs.readFile(outputFile))) as {
+          consoleEvents: Array<unknown>
+          metadata: {
+            BraveFlags?: unknown
+            CommandLine?: string
+            TraceCategories: Array<string>
+          }
+        }
+        expect(trace.consoleEvents).toEqual([])
+        expect(trace.metadata.CommandLine).toBeUndefined()
+        expect(trace.metadata.BraveFlags).toBeUndefined()
+        expect(trace.metadata.TraceCategories).toContain('netlog')
+        expect(trace.metadata.TraceCategories).not.toContain('surf.console')
+      }
+    } finally {
+      await fs.remove(folder)
+    }
+  }, 120_000)
+}

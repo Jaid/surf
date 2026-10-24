@@ -18,3 +18,5 @@ await session.exited
 `launchUnmanaged({url, app: true})` is the worker-free alternative for startup apps. It submits the browser launch request and returns `UnmanagedInfo`; it has no session handle or disposal requirement. Without `userDataDir`, the browser chooses its normal data directory. The returned `spawnedPid` may be a short-lived handoff process, not the process hosting the window.
 
 Both `TraceRecorder` and `recordBrowserTrace` accept `tracePreset: ['webgpu_game', 'network']`. Omit it or pass an empty array for standard categories. `TracePreset`, `tracePresets`, `standardTraceCategories`, and `resolveTraceCategories()` are exported for inspecting the hardcoded configuration.
+
+Both recording APIs accept repeatable category overrides as arrays: `traceCategory` and `traceExclude`. `resolveTraceCategories(presets, additions, exclusions)` exposes the same resolution rules. `recordBrowserTrace` additionally accepts `traceStart: 'manual'` and `traceDelay` in milliseconds (type `TraceStartOptions`). It returns the saved path, or `undefined` when cancelled before recording; interruption sets `process.exitCode`.

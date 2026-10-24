@@ -64,13 +64,6 @@ export const parseTracePreset = (value: string): TracePreset => {
   return value as TracePreset
 }
 
-export const resolveTraceCategories = (presets: ReadonlyArray<string> = []): Array<string> => {
-  if (!presets.length) {
-    return [...standardTraceCategories]
-  }
-  return [...new Set(presets.flatMap(preset => [...tracePresets[parseTracePreset(preset)]]))]
-}
-
 const knownSurfCategories: ReadonlySet<string> = new Set(surfTraceCategories)
 
 export const splitTraceCategories = (categories: ReadonlyArray<string>) => {
@@ -84,4 +77,30 @@ export const splitTraceCategories = (categories: ReadonlyArray<string>) => {
     collectConsole: categories.includes('surf.console'),
     collectBrowserMetadata: categories.includes('surf.browser_metadata'),
   }
+}
+
+export const parseTraceCategory = (value: string): string => {
+  if (!value || /[\s\u{0}-\u{1F}*,?]/u.test(value) || value.startsWith('-')) {
+    throw new Error('Trace categories must be nonempty exact names, not patterns or comma-separated lists.')
+  }
+  if (value.startsWith('surf.') && !knownSurfCategories.has(value)) {
+    throw new Error(`Unknown Surf trace category: ${value}`)
+  }
+  return value
+}
+
+export const resolveTraceCategories = (
+  presets: ReadonlyArray<string> = [],
+  additions: ReadonlyArray<string> = [],
+  exclusions: ReadonlyArray<string> = [],
+): Array<string> => {
+  const base = presets.length ? presets.flatMap(preset => [...tracePresets[parseTracePreset(preset)]]) : [...standardTraceCategories]
+  const excluded = new Set(exclusions.map(parseTraceCategory))
+  const included = new Set([...base, ...additions.map(parseTraceCategory)])
+  const categories = [...included.difference(excluded)]
+  // An empty Chromium inclusion list would enable its defaults, not disable tracing.
+  if (!splitTraceCategories(categories).chromiumCategories.length) {
+    throw new Error('Select at least one Chromium trace category; Surf-only or empty traces are not supported.')
+  }
+  return categories
 }

@@ -1,5 +1,6 @@
 import {defineCommand} from '@clerc/core'
 
+import {traceControlFlags} from './traceControlFlags.ts'
 import {tracePresetFlag} from './tracePresetFlag.ts'
 
 const traceCommand = defineCommand({
@@ -17,6 +18,7 @@ const traceCommand = defineCommand({
       description: 'Output .msgpack.br file; otherwise trace.msgpack.br, trace2.msgpack.br, …',
     },
     tracePreset: tracePresetFlag,
+    ...traceControlFlags,
     buffer: {
       type: Number,
       default: 4_000_000_000,

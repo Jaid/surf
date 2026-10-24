@@ -1,5 +1,6 @@
 import {defineCommand} from '@clerc/core'
 
+import {traceControlFlags} from './traceControlFlags.ts'
 import {tracePresetFlag} from './tracePresetFlag.ts'
 
 const mainCommand = defineCommand({
@@ -75,6 +76,12 @@ const mainCommand = defineCommand({
       description: 'Record a trace; optional file path, otherwise a unique tempy .msgpack.br file',
     },
     tracePreset: tracePresetFlag,
+    ...traceControlFlags,
+    exitAfterTrace: {
+      type: Boolean,
+      default: false,
+      description: 'After saving the trace, close the owned browser and exit',
+    },
     buffer: {
       type: Number,
       default: 4_000_000_000,

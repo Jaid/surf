@@ -17,3 +17,5 @@ export type {TracePreset} from './trace/categories.ts'
 export {recordBrowserTrace} from './trace/recordBrowserTrace.ts'
 export {TraceRecorder} from './trace/TraceRecorder.ts'
 export type {TraceOptions} from './trace/TraceRecorder.ts'
+
+export type {TraceStartOptions} from './trace/waitForTraceStart.ts'

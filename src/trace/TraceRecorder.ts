@@ -25,6 +25,8 @@ export type TraceOptions = {
   output?: string
   reload?: boolean
   targetId?: string
+  traceCategory?: ReadonlyArray<string>
+  traceExclude?: ReadonlyArray<string>
   tracePreset?: ReadonlyArray<TracePreset>
   userDataDir?: string
 }
@@ -81,7 +83,7 @@ export class TraceRecorder {
     }
     this.initialized = true
     const presets = [...new Set(this.options.tracePreset)]
-    const categories = resolveTraceCategories(presets)
+    const categories = resolveTraceCategories(presets, this.options.traceCategory, this.options.traceExclude)
     const selection = splitTraceCategories(categories)
     const buffer = integer(this.options.buffer ?? 4_000_000_000, 'buffer', 1, 2_147_483_647 * 1024)
     this.output = await TraceOutput.create(this.options.output)

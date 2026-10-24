@@ -56,3 +56,19 @@ test('Surf collectors are independently selected, not implicitly enabled', () =>
   })
   expect(() => splitTraceCategories(['surf.unknown'])).toThrow('Unknown Surf trace category')
 })
+test('category additions extend the base and exclusions always win', () => {
+  const categories = resolveTraceCategories(['network'], ['gpu', 'gpu', 'surf.console'], ['surf.console', 'netlog'])
+  expect(categories).toContain('gpu')
+  expect(categories.filter(category => category === 'gpu')).toHaveLength(1)
+  expect(categories).not.toContain('surf.console')
+  expect(categories).not.toContain('netlog')
+  expect(categories).not.toContain('toplevel')
+  expect(resolveTraceCategories([], ['gpu'])).toEqual([...standardTraceCategories, 'gpu'])
+})
+test('category overrides reject patterns, invalid Surf names, and empty Chromium selections', () => {
+  for (const category of ['', '*', 'net*', 'foo,bar', ' net', 'net\nlog', 'surf.typo']) {
+    expect(() => resolveTraceCategories([], [category])).toThrow()
+    expect(() => resolveTraceCategories([], [], [category])).toThrow()
+  }
+  expect(() => resolveTraceCategories([], [], ['blink.user_timing', 'devtools.timeline', 'loading', 'toplevel'])).toThrow('at least one Chromium')
+})

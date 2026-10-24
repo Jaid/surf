@@ -210,6 +210,24 @@ These are Surf categories, not Chromium instrumentation categories. Surf uses th
 
 Console records stay in the existing `consoleEvents` array, now tagged with `cat: 'surf.console'`. The 100,000-event cap and dropped-event counter are unchanged. Browser metadata stays in `metadata.CommandLine` and `metadata.BraveFlags`. Core recording metadata (browser/V8 versions, category selection, trace format, data-loss status) is always recorded; it is not a separate optional collector.
 
+### Category overrides and recording lifecycle
+
+`--trace-category <category>` and `--trace-exclude <category>` are repeatable. Surf first selects the standard list or merged presets, then adds categories, then removes exclusions. Exclusions always win, regardless of flag order. Names are exact and case-sensitive; wildcards, comma-separated lists, and unknown `surf.*` categories are rejected. At least one Chromium category must remain: an empty CDP inclusion list would enable browser defaults rather than disable them.
+
+```powershell
+surf localhost:5173 --trace --trace-preset webgpu_game --trace-category netlog --trace-exclude surf.console
+surf localhost:5173 --trace --trace-start manual --duration 15000 --exit-after-trace
+surf trace --port 9222 --trace-delay 5000 --duration 10000
+```
+
+- `--trace-start immediate|manual` defaults to immediate. Manual mode requires an interactive terminal: Enter starts recording, then a subsequent Enter saves it.
+- `--trace-delay <milliseconds>` postpones recording after browser launch/attachment. Combined with manual mode, the delay starts after Enter.
+- Ctrl+C while waiting cancels without creating an output file. A coupled browser is closed; an attached browser stays open.
+- `--duration` measures recording time, excluding the start gate and recorder setup. Optional `--reload` happens after recording starts.
+- `--exit-after-trace` closes the owned browser after saving, including Enter, duration, or buffer exhaustion. It is launch-only; `surf trace` never owns or closes the attached browser.
+
+On the launch command, all these options require `--trace`. Category overrides and start/delay controls also work with `surf trace`. Excluding `surf.console` disables console collection; excluding `surf.browser_metadata` disables command-line/experimental-flag collection without removing core recording metadata.
+
 ## better taskbar icons
 
 `--app --better-icon` supports Windows with PowerShell 7 and an HTTP(S) launch URL.
@@ -256,6 +274,8 @@ await session.exited
 `launchUnmanaged({url, app: true})` is the worker-free alternative for startup apps. It submits the browser launch request and returns `UnmanagedInfo`; it has no session handle or disposal requirement. Without `userDataDir`, the browser chooses its normal data directory. The returned `spawnedPid` may be a short-lived handoff process, not the process hosting the window.
 
 Both `TraceRecorder` and `recordBrowserTrace` accept `tracePreset: ['webgpu_game', 'network']`. Omit it or pass an empty array for standard categories. `TracePreset`, `tracePresets`, `standardTraceCategories`, and `resolveTraceCategories()` are exported for inspecting the hardcoded configuration.
+
+Both recording APIs accept repeatable category overrides as arrays: `traceCategory` and `traceExclude`. `resolveTraceCategories(presets, additions, exclusions)` exposes the same resolution rules. `recordBrowserTrace` additionally accepts `traceStart: 'manual'` and `traceDelay` in milliseconds (type `TraceStartOptions`). It returns the saved path, or `undefined` when cancelled before recording; interruption sets `process.exitCode`.
 
 ## development
 
