@@ -21,6 +21,9 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (context.rawParsed.parameters.length > 1 || flags.url !== undefined && parameters.url !== undefined) {
     throw new Error('Supply one URL, either positionally or with --url.')
   }
+  if (flags.printLog.length && (flags.detached || flags.unmanaged)) {
+    throw new Error('--print-log requires a coupled browser, not --detached or --unmanaged.')
+  }
   const traceOutput = flags.trace === undefined ? undefined : traceOutputPaths(flags.trace || temporaryFile({extension: 'msgpack.br'})).path
   if (flags.unmanaged && traceOutput) {
     throw new Error('--trace cannot be combined with --unmanaged.')
@@ -59,6 +62,8 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       detached: flags.detached || flags.unmanaged,
       unmanaged: flags.unmanaged,
       betterIcon: options.betterIcon,
+      printLog: options.printLog,
+      navigateTo: options.printLog.length ? options.url : undefined,
       trace: traceOutput,
       tracePerfetto: traceOutput ? traceOutputPaths(traceOutput).perfettoPath : undefined,
       traceCategories,

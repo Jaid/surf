@@ -12,12 +12,15 @@ export {resolveExecutable} from './browser/resolveExecutable.ts'
 export const launchBrowser = (options?: import('./browser/options.ts').LaunchOptions) => BrowserSession.launch(options)
 export default launchBrowser
 
+export type {PrintLogCategory} from './log/categories.ts'
+export {printLogCategories} from './log/categories.ts'
 export {resolveTraceCategories, splitTraceCategories, standardTraceCategories, surfTraceCategories, tracePresets} from './trace/categories.ts'
 export type {TracePreset} from './trace/categories.ts'
 export {recordBrowserTrace} from './trace/recordBrowserTrace.ts'
-export {traceOutputPaths} from './trace/TraceOutput.ts'
-export {TraceRecorder} from './trace/TraceRecorder.ts'
 
+export {traceOutputPaths} from './trace/TraceOutput.ts'
+
+export {TraceRecorder} from './trace/TraceRecorder.ts'
 export type {TraceOptions} from './trace/TraceRecorder.ts'
 
 export type {TraceStartOptions} from './trace/waitForTraceStart.ts'

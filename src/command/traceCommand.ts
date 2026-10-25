@@ -1,5 +1,6 @@
 import {defineCommand} from '@clerc/core'
 
+import {printLogFlag} from './printLogFlag.ts'
 import {traceControlFlags} from './traceControlFlags.ts'
 import {tracePresetFlag} from './tracePresetFlag.ts'
 
@@ -17,6 +18,7 @@ const traceCommand = defineCommand({
       short: 'o',
       description: 'Output stem or .msgpack.br/.pftrace.br path; otherwise numbered trace pairs',
     },
+    printLog: printLogFlag,
     tracePreset: tracePresetFlag,
     ...traceControlFlags,
     buffer: {

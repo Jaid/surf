@@ -20,6 +20,9 @@ export type DetachedInfo = {
 
 export const launchDetached = async (input: LaunchOptions = {}): Promise<DetachedInfo> => {
   const options = resolveOptions(input)
+  if (options.printLog.length) {
+    throw new Error('--print-log requires a coupled browser.')
+  }
   options.executableFile = await resolveExecutable(options.executableFile)
   const folder = join(options.cacheFolder, 'sessions', crypto.randomUUID())
   await fs.mkdir(folder, {recursive: true})

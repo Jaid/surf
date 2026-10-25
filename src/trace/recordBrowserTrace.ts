@@ -1,3 +1,4 @@
+import type {PrintLogCategory} from '../log/categories.ts'
 import type {TraceOptions} from './TraceRecorder.ts'
 import type {TraceStartOptions} from './waitForTraceStart.ts'
 
@@ -5,6 +6,8 @@ import puppeteer from 'puppeteer-core'
 
 import {integer} from '../browser/options.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
+import {BrowserLog} from '../log/BrowserLog.ts'
+import {resolvePrintLog} from '../log/categories.ts'
 import {resolveTraceCategories} from './categories.ts'
 import {resolveTraceStopTimeout} from './finishTracing.ts'
 import {recordTraceSeries} from './recordTraceSeries.ts'
@@ -13,8 +16,10 @@ import {requireTraceInput, validateTraceStart} from './waitForTraceStart.ts'
 export const recordBrowserTrace = async (options: TraceOptions & TraceStartOptions & {
   duration?: number
   port?: number
+  printLog?: ReadonlyArray<PrintLogCategory>
   repeat?: boolean
 } = {}) => {
+  const printLog = resolvePrintLog(options.printLog)
   const port = integer(options.port ?? 9222, 'port', 1, 65_535)
   if (options.duration !== undefined) {
     integer(options.duration, 'duration', 1, 2_147_483_647)
@@ -41,6 +46,7 @@ export const recordBrowserTrace = async (options: TraceOptions & TraceStartOptio
   const onDisconnect = () => disconnected.resolve(1)
   browser.on('disconnected', onDisconnect)
   try {
+    await using log = await BrowserLog.attach(browser, printLog, options.targetId)
     const result = await recordTraceSeries(browser, {
       ...options,
       traceOptions: index => ({

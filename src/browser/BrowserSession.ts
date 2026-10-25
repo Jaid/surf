@@ -5,6 +5,7 @@ import type {Browser} from 'puppeteer-core'
 import {join} from 'forward-slash-path'
 import puppeteer from 'puppeteer-core'
 
+import {BrowserLog} from '../log/BrowserLog.ts'
 import {browserArguments, resolveOptions} from './options.ts'
 import {resolveExecutable} from './resolveExecutable.ts'
 import {UserData} from './UserData.ts'
@@ -16,6 +17,7 @@ export class BrowserSession {
     const userData = await UserData.create(options.userDataDir)
     const args = browserArguments(options, userData.path)
     let browser: Browser | undefined
+    let log: BrowserLog | undefined
     try {
       browser = await puppeteer.launch({
         executablePath: executable,
@@ -31,6 +33,11 @@ export class BrowserSession {
         handleSIGHUP: false,
       })
       const session = new BrowserSession(browser, userData, options, executable, args)
+      if (options.printLog.length) {
+        log = await BrowserLog.attach(browser, options.printLog)
+        session.log = log
+        await log.navigate(options.url)
+      }
       if (options.betterIcon) {
         try {
           const {IconOverride} = await import('../icon/IconOverride.ts')
@@ -42,6 +49,7 @@ export class BrowserSession {
       return session
     } catch (error) {
       try {
+        await log?.[Symbol.asyncDispose]()
         await browser?.close()
       } finally {
         await userData.dispose()
@@ -54,6 +62,7 @@ export class BrowserSession {
 
   private closing?: Promise<void>
   private icon?: IconOverride
+  private log?: BrowserLog
 
   private constructor(
     readonly browser: Browser,
@@ -95,6 +104,7 @@ export class BrowserSession {
 
   private async dispose() {
     try {
+      await this.log?.[Symbol.asyncDispose]()
       await this.icon?.[Symbol.asyncDispose]()
     } finally {
       const timer = setTimeout(() => {

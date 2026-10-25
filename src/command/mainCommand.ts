@@ -1,5 +1,6 @@
 import {defineCommand} from '@clerc/core'
 
+import {printLogFlag} from './printLogFlag.ts'
 import {traceControlFlags} from './traceControlFlags.ts'
 import {tracePresetFlag} from './tracePresetFlag.ts'
 
@@ -75,6 +76,7 @@ const mainCommand = defineCommand({
       type: String,
       description: 'Record a .pftrace.br + .msgpack.br pair; optional path/stem, otherwise tempy',
     },
+    printLog: printLogFlag,
     tracePreset: tracePresetFlag,
     ...traceControlFlags,
     exitAfterTrace: {

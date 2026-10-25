@@ -8,6 +8,7 @@ sections:
   lifetimeAndProfiles: lifetimeAndProfiles.md
   browserDefaults: browserDefaults.md
   tracing: tracing.md
+  liveLogs: liveLogs.md
   betterTaskbarIcons: betterTaskbarIcons.md
   cache: cache.md
   library: library.md

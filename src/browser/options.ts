@@ -1,4 +1,7 @@
+import type {PrintLogCategory} from '../log/categories.ts'
+
 import {defaultCacheFolder, resolvePath} from '../lib/paths.ts'
+import {resolvePrintLog} from '../log/categories.ts'
 
 export type LaunchOptions = {
   app?: boolean
@@ -9,6 +12,7 @@ export type LaunchOptions = {
   kiosk?: boolean
   performance?: boolean
   port?: number
+  printLog?: ReadonlyArray<PrintLogCategory>
   profile?: string
   timeout?: number
   url?: string
@@ -59,6 +63,7 @@ export const resolveOptions = (options: LaunchOptions = {}) => {
   }
   return {
     ...options,
+    printLog: resolvePrintLog(options.printLog),
     url,
     profile,
     app: options.app ?? false,
@@ -95,5 +100,5 @@ export const browserArguments = (options: ResolvedLaunchOptions, userDataDir: st
   ...performanceArguments(options),
   ...options.args,
   ...options.kiosk ? ['--kiosk'] : [],
-  options.app ? `--app=${options.url}` : options.url,
+  options.app ? `--app=${options.printLog.length ? 'about:blank' : options.url}` : (options.printLog.length ? 'about:blank' : options.url),
 ]

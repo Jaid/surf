@@ -47,6 +47,10 @@ test('dump supports URL placement, spaces, app mode, and browser passthrough', a
 test('invalid inputs fail without launching', async () => {
   for (const args of [
     ['--unknown'],
+    ['--print-log', 'unknown'],
+    ['--print-log', 'console', '--detached'],
+    ['--print-log', 'network', '--unmanaged'],
+    ['trace', '--print-log', 'unknown'],
     ['first.com', 'second.com'],
     ['first.com', '--url', 'second.com'],
     ['--port', '65536'],
@@ -197,4 +201,18 @@ test('trace stop timeout is resolved in the launch plan', async () => {
     expect(result.code).toBe(0)
     expect((JSON.parse(result.stdout) as {traceStopTimeout: number}).traceStopTimeout).toBe(timeout ?? 300_000)
   }
+})
+test('print-log is repeatable, independent of tracing, and initializes before navigation', async () => {
+  const result = await cli('--dump', '--executable-file', Bun.argv[0], 'example.com', '--app', '--print-log', 'console', '--print-log', 'network', '--print-log', 'console')
+  expect(result.code).toBe(0)
+  const dump = JSON.parse(result.stdout) as {
+    args: Array<string>
+    navigateTo: string
+    printLog: Array<string>
+  }
+  expect(dump.printLog).toEqual(['console', 'network'])
+  expect(dump.args).toContain('--app=about:blank')
+  expect(dump.navigateTo).toBe('https://example.com/')
+  const help = await cli('trace', '--help')
+  expect(help.stdout).toContain('--print-log')
 })

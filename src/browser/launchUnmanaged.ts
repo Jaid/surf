@@ -11,6 +11,9 @@ export type UnmanagedLaunchOptions = Omit<LaunchOptions, 'betterIcon' | 'cacheFo
 export const resolveUnmanagedOptions = (input: UnmanagedLaunchOptions = {}) => {
   // Also reject incompatible options from JavaScript callers rather than ignoring them.
   const options = input as LaunchOptions
+  if (options.printLog?.length) {
+    throw new Error('--print-log requires a coupled browser.')
+  }
   if (options.betterIcon) {
     throw new Error('Unmanaged launches do not support --better-icon. Use a managed session instead.')
   }
