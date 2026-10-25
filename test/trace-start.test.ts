@@ -26,6 +26,7 @@ test('manual start waits for Enter and releases its input listeners', async () =
   expect(input.listenerCount('data')).toBe(0)
   expect(input.listenerCount('end')).toBe(0)
   expect(input.listenerCount('error')).toBe(0)
+  expect(input.isPaused()).toBe(true)
   input.destroy()
 })
 test('manual cancellation cleans up without starting', async () => {

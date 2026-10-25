@@ -7,12 +7,13 @@ import {integer} from '../browser/options.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
 import {resolveTraceCategories} from './categories.ts'
 import {resolveTraceStopTimeout} from './finishTracing.ts'
-import {TraceRecorder} from './TraceRecorder.ts'
-import {requireTraceInput, validateTraceStart, waitForTraceStart} from './waitForTraceStart.ts'
+import {recordTraceSeries} from './recordTraceSeries.ts'
+import {requireTraceInput, validateTraceStart} from './waitForTraceStart.ts'
 
 export const recordBrowserTrace = async (options: TraceOptions & TraceStartOptions & {
   duration?: number
   port?: number
+  repeat?: boolean
 } = {}) => {
   const port = integer(options.port ?? 9222, 'port', 1, 65_535)
   if (options.duration !== undefined) {
@@ -39,27 +40,19 @@ export const recordBrowserTrace = async (options: TraceOptions & TraceStartOptio
   const disconnected = Promise.withResolvers<number>()
   const onDisconnect = () => disconnected.resolve(1)
   browser.on('disconnected', onDisconnect)
-  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    const cancelled = await waitForTraceStart(options, Promise.race([stop.promise, disconnected.promise]))
-    if (!browser.connected) {
-      throw new Error('Browser disconnected before recording started.')
+    const result = await recordTraceSeries(browser, {
+      ...options,
+      traceOptions: index => ({
+        ...options,
+        numberOutput: index > 0 || options.numberOutput,
+      }),
+    }, Promise.race([stop.promise, disconnected.promise]))
+    if (result.code !== undefined && result.output === undefined) {
+      process.exitCode = result.code
     }
-    if (cancelled !== undefined || stop.code !== undefined) {
-      process.exitCode = cancelled ?? stop.code
-      return
-    }
-    const recorder = new TraceRecorder(browser, options)
-    await using recording = await recorder.start()
-    using recordingStop = new StopRequest(true)
-    if (options.duration) {
-      timer = setTimeout(() => stop.stop(), options.duration)
-    }
-    console.error('Press Enter or Ctrl+C to stop and save. The browser stays open.')
-    await Promise.race([stop.promise, recordingStop.promise, recorder.finished])
-    return await recorder.stop()
+    return result.output
   } finally {
-    clearTimeout(timer)
     browser.off('disconnected', onDisconnect)
     await browser.disconnect()
   }

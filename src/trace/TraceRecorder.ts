@@ -21,6 +21,7 @@ import {writeTracePair} from './writeTracePair.ts'
 export type TraceOptions = {
   buffer?: number
   metadata?: Record<string, unknown>
+  numberOutput?: boolean
   output?: string
   reload?: boolean
   targetId?: string
@@ -34,6 +35,7 @@ export type TraceOptions = {
 
 export class TraceRecorder {
   readonly finished: Promise<string>
+  readonly readyForNext: Promise<void>
   private capturing = false
   private readonly complete = Promise.withResolvers<Protocol.Tracing.TracingCompleteEvent>()
   private consoleEvents: Array<BrowserConsoleEvent> = []
@@ -60,6 +62,7 @@ export class TraceRecorder {
     }
     const error = new Error('Browser disconnected before the trace was saved. Stop recording before closing the browser.')
     this.complete.reject(error)
+    this.released.reject(error)
     this.fail(error)
     if (this.started) {
       void this.stop().catch(() => {})
@@ -67,6 +70,7 @@ export class TraceRecorder {
   }
   private output?: TraceOutput
   private pageSession?: CDPSession
+  private readonly released = Promise.withResolvers<void>()
   private session?: CDPSession
 
   private started = false
@@ -76,6 +80,8 @@ export class TraceRecorder {
   private readonly title: TraceTitle
 
   constructor(readonly browser: Browser, readonly options: TraceOptions = {}) {
+    this.readyForNext = this.released.promise
+    void this.readyForNext.catch(() => {})
     this.stopTimeout = resolveTraceStopTimeout(options.traceStopTimeout)
     this.title = new TraceTitle(options.titleUpdates)
     const {promise, resolve, reject} = Promise.withResolvers<string>()
@@ -87,6 +93,10 @@ export class TraceRecorder {
     void this.complete.promise.catch(() => {})
   }
 
+  get isStopping() {
+    return this.stopping !== undefined
+  }
+
   async start() {
     if (this.initialized) {
       throw new Error('A trace recorder can only be started once.')
@@ -96,7 +106,7 @@ export class TraceRecorder {
     const categories = resolveTraceCategories(presets, this.options.traceCategory, this.options.traceExclude)
     const selection = splitTraceCategories(categories)
     const buffer = integer(this.options.buffer ?? 4_000_000_000, 'buffer', 1, 2_147_483_647 * 1024)
-    this.output = await TraceOutput.create(this.options.output)
+    this.output = await TraceOutput.create(this.options.output, this.options.numberOutput)
     try {
       this.session = await this.browser.target().createCDPSession()
       this.browser.on('disconnected', this.onDisconnect)
@@ -169,6 +179,7 @@ export class TraceRecorder {
       console.error(`Recording ${version.product} → ${this.output.path}`)
       return this
     } catch (error) {
+      this.released.reject(error)
       if (this.started) {
         await this.stop().catch(() => {})
       } else {
@@ -186,6 +197,7 @@ export class TraceRecorder {
       this.finish(output)
       return output
     }, (error: unknown) => {
+      this.released.reject(error)
       this.fail(error)
       throw error
     })
@@ -248,6 +260,9 @@ export class TraceRecorder {
       if (!stream || event.traceFormat !== 'proto' || event.streamCompression !== 'gzip') {
         throw new Error('Browser did not return the requested gzip Perfetto stream.')
       }
+      // Chromium can record again while this immutable stream is downloaded.
+      this.title[Symbol.dispose]()
+      this.released.resolve()
       console.error('Downloading the finalized trace…')
       const timeout = this.stopTimeout
       const handle = stream

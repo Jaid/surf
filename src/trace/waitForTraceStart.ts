@@ -41,7 +41,7 @@ export const waitForTraceStart = async (
       }
     }
     const onEnd = () => ready.reject(new Error('Terminal input closed before trace recording started.'))
-    const wasPaused = input.isPaused()
+    const wasPaused = input.readableFlowing !== true
     input.on('data', onInput)
     input.on('end', onEnd)
     input.on('error', ready.reject)

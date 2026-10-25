@@ -13,24 +13,25 @@ export const traceOutputPaths = (output: string) => {
 }
 
 export class TraceOutput {
-  static async create(output?: string) {
+  static async create(output?: string, numbered = false) {
     const requested = output === undefined ? undefined : traceOutputPaths(output).path
+    const strict = requested !== undefined && !numbered
     const base = requested ?? resolvePath('trace.msgpack.br')
     await fs.mkdir(dirname(base), {recursive: true})
     for (let index = 1; ; index++) {
-      const path = requested ?? (index === 1 ? base : `${base.slice(0, -'.msgpack.br'.length)}${index}.msgpack.br`)
+      const path = strict ? requested : (index === 1 ? base : `${base.slice(0, -'.msgpack.br'.length)}${index}.msgpack.br`)
       const lock = `${path}.lock`
       try {
         await using handle = await fs.promises.open(lock, 'wx')
       } catch (error) {
-        if (!requested && (error as NodeJS.ErrnoException).code === 'EEXIST') {
+        if (!strict && (error as NodeJS.ErrnoException).code === 'EEXIST') {
           continue
         }
         throw new Error(`Cannot reserve trace output: ${path}`, {cause: error})
       }
       try {
         if (await fs.pathExists(path) || await fs.pathExists(traceOutputPaths(path).perfettoPath)) {
-          if (requested) {
+          if (strict) {
             throw new Error(`Refusing to overwrite trace: ${path}`)
           }
           await fs.rm(lock)

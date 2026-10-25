@@ -10,11 +10,11 @@ Bare `--trace` (or `--trace=`) chooses a unique `tempy.temporaryFile({extension:
 
 When placing the URL after `--trace`, use `--url` so it is not interpreted as the optional output path; alternatively put the positional URL before `--trace`. `--dump` shows the resolved output path without creating a file. The separate `surf trace` command retains its existing working-directory default when `--output` is omitted.
 
-- Enter saves the trace and leaves the coupled browser open.
+- Enter saves the trace and leaves the coupled browser open. Press Enter again to start a new recording.
 - Ctrl+C saves the trace **before** closing the browser.
 - `--duration` is in milliseconds; reaching it saves the trace but does not close the browser.
 - Buffer exhaustion also stops and saves recording.
-- `--title-updates` defaults to true for both launch-time tracing and `surf trace`. In an interactive terminal, ANSI title sequences show `42.3% 2m 7s slop.gallery`. Elapsed recording time updates every second; buffer fill updates on Chromium’s reports (every five seconds). The hostname comes from the selected page URL when recording starts (omitted for URLs without a hostname). While saving, the title freezes at the final recording duration. The previous title is restored on completion or failure. Redirected stderr stays escape-free. Disable with `--title-updates=false`; without tracing it has no effect.
+- `--title-updates` defaults to true for both launch-time tracing and `surf trace`. In an interactive terminal, ANSI title sequences show `42.3% 2m 7s slop.gallery`. Elapsed recording time updates every second; buffer fill updates on Chromium’s reports (every five seconds). The hostname comes from the selected page URL when recording starts (omitted for URLs without a hostname). While saving, the title freezes at the final recording duration. The previous title is restored once Chromium has finalized the recording, or on failure. Redirected stderr stays escape-free. Disable with `--title-updates=false`; without tracing it has no effect.
 - Closing the browser window during recording cannot flush its in-memory trace. Stop recording first; Surf reports a failure and removes partial output if the connection is lost.
 
 ### Attach to a running browser
@@ -24,9 +24,25 @@ surf trace --port 9222
 surf trace --port 9222 --output ./trace.msgpack.br --duration 10000 --reload
 ```
 
-`surf trace` never closes the browser. Enter, Ctrl+C, or the optional duration stops recording. Launch-time `--trace` cannot be combined with `--detached`; use this separate command instead.
+`surf trace` never closes the browser. In an interactive terminal, Enter saves and another Enter starts a fresh recording; Ctrl+C saves and detaches. Without an interactive terminal, it exits after one recording. The optional duration stops each recording. Launch-time `--trace` cannot be combined with `--detached`; use this separate command instead.
 
 The trace is browser-wide. Console events and optional reload belong to the first page target, or the page selected with `surf trace --target-id <id>`. The default trace buffer is 4,000,000,000 bytes; change it with `--buffer`.
+
+### Repeated recordings
+
+In an interactive terminal, both launch-time tracing and `surf trace` stay ready for another recording:
+
+- Enter while recording stops and saves it.
+- Enter while finalizing queues **one** restart; repeated presses coalesce. The restart begins as soon as Chromium releases the tracing session, even while the previous trace is still downloading/compressing.
+- Enter while idle starts the next recording immediately (after any configured `--trace-delay`).
+- Ctrl+C cancels a queued restart, stops an active recording, and waits for all pending saves before closing the owned browser or detaching.
+- `--exit-after-trace` remains single-shot and ignores queued restarts. Non-interactive sessions also record only once.
+
+Each recording gets a new UUID, console collection, buffer, duration timer, and terminal-title timer. Categories/presets, reload, delay, and duration apply to every recording; `--trace-start manual` gates only the first recording.
+
+Bare `--trace` chooses a fresh tempy output for each recording. With an explicit stem, the first recording keeps the exact path; subsequent recordings use `game2.*`, `game3.*`, skipping existing pairs and reservations without overwriting anything. Default attachment filenames remain `trace.*`, `trace2.*`.
+
+The library's `recordBrowserTrace()` remains single-shot by default. Opt into interactive repetition with `repeat: true`; it returns the last saved sidecar after exiting. `TraceRecorder.readyForNext` resolves when Chromium has finalized the stream, before `finished` resolves; the browser must remain connected until outstanding downloads finish.
 
 ### Saving and finalization timeouts
 

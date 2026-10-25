@@ -48,7 +48,10 @@ const traceCommand = defineCommand({
     throw new Error('surf trace accepts flags only.')
   }
   const {recordBrowserTrace} = await import('../trace/recordBrowserTrace.ts')
-  await recordBrowserTrace(context.flags)
+  await recordBrowserTrace({
+    ...context.flags,
+    repeat: true,
+  })
 })
 
 export default traceCommand

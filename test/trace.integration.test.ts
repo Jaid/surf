@@ -354,3 +354,128 @@ for (const mode of ['delayed', 'manual', 'cancel-manual', 'cancel-delay']) {
     }
   }, 120_000)
 }
+for (const mode of ['series-queued', 'series-idle', 'series-cancel', 'series-duration']) {
+  integration(`Enter starts another recording: ${mode}`, async () => {
+    const folder = await fs.mkdtemp(join(tmpdir(), 'surf-trace-series-'))
+    try {
+      const output = join(folder, 'trace.msgpack.br')
+      // A pre-existing sibling must be skipped, not overwritten.
+      await fs.writeFile(join(folder, 'trace2.pftrace.br'), 'existing')
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, 'fixtures/coupled.ts'), mode, JSON.stringify([
+        'about:blank',
+        '--executable-file',
+        executableFile!,
+        '--trace',
+        output,
+        '--buffer',
+        '16000000',
+        ...mode === 'series-duration' ? ['--duration', '50'] : [],
+        '--',
+        '--headless=new',
+      ])], {
+        stdout: 'pipe',
+        stderr: 'pipe',
+        timeout: 90_000,
+      })
+      const stdoutResponse = new Response(child.stdout)
+      const stderrResponse = new Response(child.stderr)
+      const [code, stdout, stderr] = await Promise.all([child.exited, stdoutResponse.text(), stderrResponse.text()])
+      expect(code).toBe(130)
+      expect(stderr.match(/Recording /gu)).toHaveLength(mode === 'series-cancel' ? 1 : 2)
+      expect(stderr.match(/Saved /gu)).toHaveLength(mode === 'series-cancel' ? 1 : 2)
+      if (mode === 'series-queued') {
+        const secondRecording = stderr.indexOf('Recording ', stderr.indexOf('Recording ') + 1)
+        expect(secondRecording).toBeLessThan(stderr.indexOf('Saved '))
+      }
+      const first = unpack(brotliDecompressSync(await fs.readFile(output))) as TraceSidecar
+      expect(first.metadata.RecordingId).toBeString()
+      if (mode !== 'series-cancel') {
+        const second = unpack(brotliDecompressSync(await fs.readFile(join(folder, 'trace3.msgpack.br')))) as TraceSidecar
+        expect(second.metadata.RecordingId).not.toBe(first.metadata.RecordingId)
+        expect(second.perfetto.file).toBe('trace3.pftrace.br')
+      }
+      expect(await fs.readFile(join(folder, 'trace2.pftrace.br'), 'utf8')).toBe('existing')
+      const info = JSON.parse(stdout) as {userDataDir: string}
+      expect(await fs.pathExists(info.userDataDir)).toBe(false)
+      const files = await fs.readdir(folder)
+      expect(files.some(file => /lock|partial/u.test(file))).toBe(false)
+    } finally {
+      await fs.remove(folder)
+    }
+  }, 120_000)
+}
+integration('attached CLI can queue a second recording without owning the browser', async () => {
+  const folder = await fs.mkdtemp(join(tmpdir(), 'surf-attach-series-'))
+  try {
+    await using session = await BrowserSession.launch({
+      executableFile,
+      url: 'about:blank',
+      args: ['--headless=new'],
+    })
+    const endpoint = new URL(session.info.webSocketDebuggerUrl)
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, 'fixtures/coupled.ts'), 'series-queued', JSON.stringify([
+      'trace',
+      '--port',
+      endpoint.port,
+      '--output',
+      join(folder, 'trace.msgpack.br'),
+      '--buffer',
+      '16000000',
+    ])], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+      timeout: 90_000,
+    })
+    const stdoutResponse = new Response(child.stdout)
+    const stderrResponse = new Response(child.stderr)
+    const [code, , stderr] = await Promise.all([child.exited, stdoutResponse.text(), stderrResponse.text()])
+    expect(code).toBe(0)
+    expect(stderr.match(/Saved /gu)).toHaveLength(2)
+    expect(session.browser.connected).toBe(true)
+    expect(await fs.readdir(folder)).toEqual(['trace.msgpack.br', 'trace.pftrace.br', 'trace2.msgpack.br', 'trace2.pftrace.br'])
+  } finally {
+    await fs.remove(folder)
+  }
+}, 120_000)
+for (const exitAfterTrace of [false, true]) {
+  integration(`repeated tempy recordings respect exit-after-trace=${exitAfterTrace}`, async () => {
+    const files: Array<string> = []
+    try {
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, 'fixtures/coupled.ts'), 'series-queued', JSON.stringify([
+        'about:blank',
+        '--executable-file',
+        executableFile!,
+        '--trace',
+        '--buffer',
+        '16000000',
+        ...exitAfterTrace ? ['--exit-after-trace'] : [],
+        '--',
+        '--headless=new',
+      ])], {
+        stdout: 'pipe',
+        stderr: 'pipe',
+        timeout: 90_000,
+      })
+      const stdoutResponse = new Response(child.stdout)
+      const stderrResponse = new Response(child.stderr)
+      const [code, , stderr] = await Promise.all([child.exited, stdoutResponse.text(), stderrResponse.text()])
+      for (const match of stderr.matchAll(/Recording [^\n]+ → ([^\n\r]+)/gu)) {
+        files.push(match[1])
+      }
+      expect(code).toBe(exitAfterTrace ? 0 : 130)
+      expect(files).toHaveLength(exitAfterTrace ? 1 : 2)
+      const uniqueFiles = new Set(files)
+      expect(uniqueFiles.size).toBe(files.length)
+      for (const output of files) {
+        expect(output.startsWith(`${tmpdir().replaceAll('\\', '/')}/`)).toBe(true)
+        const events = await readPerfettoEvents(output)
+        expect(events.length).toBeGreaterThan(0)
+      }
+    } finally {
+      for (const output of files) {
+        await fs.rm(output, {force: true})
+        await fs.rm(traceOutputPaths(output).perfettoPath, {force: true})
+      }
+    }
+  }, 120_000)
+}

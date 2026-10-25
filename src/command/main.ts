@@ -11,9 +11,9 @@ import {resolveExecutable} from '../browser/resolveExecutable.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
 import {resolveTraceCategories} from '../trace/categories.ts'
 import {resolveTraceStopTimeout} from '../trace/finishTracing.ts'
+import {recordTraceSeries} from '../trace/recordTraceSeries.ts'
 import {traceOutputPaths} from '../trace/TraceOutput.ts'
-import {TraceRecorder} from '../trace/TraceRecorder.ts'
-import {requireTraceInput, validateTraceStart, waitForTraceStart} from '../trace/waitForTraceStart.ts'
+import {requireTraceInput, validateTraceStart} from '../trace/waitForTraceStart.ts'
 
 // eslint-disable-next-line typescript/no-misused-promises
 export const run: CommandHandler<typeof mainCommand> = async context => {
@@ -86,16 +86,14 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     process.exitCode = stop.code
     return
   }
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    if (traceOutput) {
-      const cancelled = await waitForTraceStart(flags, Promise.race([session.exited, stop.promise]))
-      if (cancelled !== undefined) {
-        process.exitCode = cancelled
-        return
-      }
-      const recorder = new TraceRecorder(session.browser, {
-        output: traceOutput,
+  if (traceOutput) {
+    const result = await recordTraceSeries(session.browser, {
+      ...flags,
+      owned: true,
+      repeat: true,
+      traceOptions: index => ({
+        output: index > 0 && !flags.trace ? temporaryFile({extension: 'msgpack.br'}) : traceOutput,
+        numberOutput: index > 0 && Boolean(flags.trace),
         tracePreset: flags.tracePreset,
         traceCategory: flags.traceCategory,
         traceExclude: flags.traceExclude,
@@ -105,47 +103,12 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
         reload: flags.reload,
         userDataDir: session.userData.path,
         metadata: {SurfArguments: [session.executable, ...session.args]},
-      })
-      await using recording = await recorder.start()
-      // Enter finishes only the trace; signals finish the whole coupled session.
-      const onInput = (data: Buffer) => {
-        if (data.includes(10) || data.includes(13)) {
-          void recorder.stop().catch(() => {})
-        }
-      }
-      if (process.stdin.isTTY) {
-        process.stdin.on('data', onInput)
-        process.stdin.resume()
-      }
-      if (flags.duration) {
-        timer = setTimeout(() => {
-          void recorder.stop().catch(() => {})
-        }, flags.duration)
-      }
-      console.error(flags.exitAfterTrace ? 'Press Enter or Ctrl+C to save the trace and close the browser.' : 'Press Enter to save the trace, or Ctrl+C to save and close the browser.')
-      try {
-        const result = await Promise.race([
-          session.exited.then(code => ({code})),
-          stop.promise.then(code => ({code})),
-          recorder.finished.then(() => {}),
-        ])
-        await recorder.stop()
-        if (flags.exitAfterTrace && !result) {
-          return
-        }
-        if (result) {
-          process.exitCode = result.code
-          return
-        }
-      } finally {
-        process.stdin.off('data', onInput)
-        if (process.stdin.isTTY) {
-          process.stdin.pause()
-        }
-      }
+      }),
+    }, Promise.race([session.exited, stop.promise]))
+    if (result.code !== undefined || flags.exitAfterTrace) {
+      process.exitCode = result.code ?? 0
+      return
     }
-    process.exitCode = await Promise.race([session.exited, stop.promise])
-  } finally {
-    clearTimeout(timer)
   }
+  process.exitCode = await Promise.race([session.exited, stop.promise])
 }
