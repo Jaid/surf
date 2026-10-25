@@ -2,6 +2,11 @@ import {parseTraceCategory} from '../trace/categories.ts'
 import {parseTraceStart} from '../trace/waitForTraceStart.ts'
 
 export const traceControlFlags = {
+  titleUpdates: {
+    type: Boolean,
+    default: true,
+    description: 'Show trace buffer usage in the terminal tab title (TTY only)',
+  },
   traceCategory: {
     type: [parseTraceCategory] as const,
     description: 'Add an exact trace category after defaults/presets; repeat to add more',

@@ -14,6 +14,7 @@ import {resolvePath} from '../lib/paths.ts'
 import {readBrowserMetadata} from './browserMetadata.ts'
 import {resolveTraceCategories, splitTraceCategories} from './categories.ts'
 import {TraceOutput} from './TraceOutput.ts'
+import {TraceTitle} from './TraceTitle.ts'
 import {writeTracePair} from './writeTracePair.ts'
 
 export type TraceOptions = {
@@ -22,6 +23,7 @@ export type TraceOptions = {
   output?: string
   reload?: boolean
   targetId?: string
+  titleUpdates?: boolean
   traceCategory?: ReadonlyArray<string>
   traceExclude?: ReadonlyArray<string>
   tracePreset?: ReadonlyArray<TracePreset>
@@ -40,7 +42,12 @@ export class TraceRecorder {
   private initialized = false
   private metadata: Record<string, unknown> = {}
   private readonly onBuffer = (event: Protocol.Tracing.BufferUsageEvent) => {
-    if ((event.percentFull ?? event.value ?? 0) >= 0.995) {
+    if (!this.capturing) {
+      return
+    }
+    const value = event.percentFull ?? event.value ?? 0
+    this.title.buffer(value)
+    if (value >= 0.995) {
       void this.stop().catch(this.fail)
     }
   }
@@ -63,8 +70,10 @@ export class TraceRecorder {
   private started = false
   private startedAt?: string
   private stopping?: Promise<string>
+  private readonly title: TraceTitle
 
   constructor(readonly browser: Browser, readonly options: TraceOptions = {}) {
+    this.title = new TraceTitle(options.titleUpdates)
     const {promise, resolve, reject} = Promise.withResolvers<string>()
     this.finished = promise
     this.finish = resolve
@@ -100,6 +109,7 @@ export class TraceRecorder {
         TraceCategories: categories,
         ChromiumTraceCategories: selection.chromiumCategories,
       }
+      let titleUrl = ''
       if (selection.collectConsole || this.options.reload || this.options.targetId) {
         await this.browser.waitForTarget(target => target.type() === TargetType.PAGE, {timeout: 10_000})
         for (const target of this.browser.targets()) {
@@ -111,6 +121,7 @@ export class TraceRecorder {
             const {targetInfo} = await candidate.send('Target.getTargetInfo')
             if (!this.options.targetId || targetInfo.targetId === this.options.targetId) {
               this.pageSession = candidate
+              titleUrl = targetInfo.url
               if (selection.collectConsole) {
                 this.metadata.ConsoleTarget = targetInfo
               }
@@ -147,6 +158,7 @@ export class TraceRecorder {
       })
       this.started = true
       this.capturing = true
+      this.title.start(titleUrl || this.browser.targets().find(target => target.type() === TargetType.PAGE)?.url() || '')
       if (this.options.reload) {
         await this.pageSession!.send('Page.reload')
       }
@@ -204,6 +216,7 @@ export class TraceRecorder {
   }
 
   private async cleanup() {
+    this.title[Symbol.dispose]()
     this.browser.off('disconnected', this.onDisconnect)
     if (this.session) {
       this.session.off('Tracing.tracingComplete', this.onComplete)
@@ -220,6 +233,7 @@ export class TraceRecorder {
       throw new Error('Trace recording has not started.')
     }
     this.capturing = false
+    this.title.saving()
     const session = this.session
     const proto = this.output.temporary('pftrace')
     const stoppedAt = new Date

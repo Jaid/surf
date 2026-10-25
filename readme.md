@@ -122,6 +122,7 @@ When placing the URL after `--trace`, use `--url` so it is not interpreted as th
 - Ctrl+C saves the trace **before** closing the browser.
 - `--duration` is in milliseconds; reaching it saves the trace but does not close the browser.
 - Buffer exhaustion also stops and saves recording.
+- `--title-updates` defaults to true for both launch-time tracing and `surf trace`. In an interactive terminal, ANSI title sequences show `42.3% 2m 7s slop.gallery`. Elapsed recording time updates every second; buffer fill updates on Chromium’s reports (every five seconds). The hostname comes from the selected page URL when recording starts (omitted for URLs without a hostname). While saving, the title freezes at the final recording duration. The previous title is restored on completion or failure. Redirected stderr stays escape-free. Disable with `--title-updates=false`; without tracing it has no effect.
 - Closing the browser window during recording cannot flush its in-memory trace. Stop recording first; Surf reports a failure and removes partial output if the connection is lost.
 
 ### Attach to a running browser

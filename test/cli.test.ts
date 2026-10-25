@@ -178,3 +178,13 @@ test('dump resolves both trace filenames from either extension or a stem', async
     expect(dump.tracePerfetto).toBe(resolve('pair.pftrace.br'))
   }
 })
+test('trace title updates default on and accept explicit false', async () => {
+  for (const enabled of [true, false]) {
+    const result = await cli('--dump', '--executable-file', Bun.argv[0], '--trace', ...enabled ? [] : ['--title-updates=false'])
+    expect(result.code).toBe(0)
+    expect((JSON.parse(result.stdout) as {titleUpdates: boolean}).titleUpdates).toBe(enabled)
+    expect(result.stdout).not.toContain('\u{1B}]')
+  }
+  const help = await cli('trace', '--help')
+  expect(help.stdout).toContain('--title-updates')
+})
