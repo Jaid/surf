@@ -10,6 +10,7 @@ import {browserArguments, integer, resolveOptions} from '../browser/options.ts'
 import {resolveExecutable} from '../browser/resolveExecutable.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
 import {resolveTraceCategories} from '../trace/categories.ts'
+import {resolveTraceStopTimeout} from '../trace/finishTracing.ts'
 import {traceOutputPaths} from '../trace/TraceOutput.ts'
 import {TraceRecorder} from '../trace/TraceRecorder.ts'
 import {requireTraceInput, validateTraceStart, waitForTraceStart} from '../trace/waitForTraceStart.ts'
@@ -30,9 +31,10 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (!traceOutput && flags.tracePreset.length) {
     throw new Error('--trace-preset requires --trace.')
   }
-  if (!traceOutput && (flags.traceCategory.length || flags.traceExclude.length || flags.traceStart !== undefined || flags.traceDelay !== undefined || flags.exitAfterTrace)) {
-    throw new Error('Trace category, start, delay, and exit options require --trace.')
+  if (!traceOutput && (flags.traceCategory.length || flags.traceExclude.length || flags.traceStart !== undefined || flags.traceDelay !== undefined || flags.traceStopTimeout !== undefined || flags.exitAfterTrace)) {
+    throw new Error('Trace category, start, delay, stop timeout, and exit options require --trace.')
   }
+  const traceStopTimeout = resolveTraceStopTimeout(flags.traceStopTimeout)
   validateTraceStart(flags)
   const traceCategories = traceOutput ? resolveTraceCategories(flags.tracePreset, flags.traceCategory, flags.traceExclude) : undefined
   if (!traceOutput && (flags.reload || flags.duration !== undefined)) {
@@ -61,6 +63,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       tracePerfetto: traceOutput ? traceOutputPaths(traceOutput).perfettoPath : undefined,
       traceCategories,
       titleUpdates: flags.titleUpdates,
+      traceStopTimeout: traceOutput ? traceStopTimeout : undefined,
       traceStart: traceOutput ? flags.traceStart ?? 'immediate' : undefined,
       traceDelay: traceOutput ? flags.traceDelay ?? 0 : undefined,
       exitAfterTrace: flags.exitAfterTrace,
@@ -98,6 +101,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
         traceExclude: flags.traceExclude,
         buffer: flags.buffer,
         titleUpdates: flags.titleUpdates,
+        traceStopTimeout,
         reload: flags.reload,
         userDataDir: session.userData.path,
         metadata: {SurfArguments: [session.executable, ...session.args]},

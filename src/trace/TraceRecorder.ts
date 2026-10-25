@@ -13,6 +13,7 @@ import {integer} from '../browser/options.ts'
 import {resolvePath} from '../lib/paths.ts'
 import {readBrowserMetadata} from './browserMetadata.ts'
 import {resolveTraceCategories, splitTraceCategories} from './categories.ts'
+import {finishTracing, resolveTraceStopTimeout} from './finishTracing.ts'
 import {TraceOutput} from './TraceOutput.ts'
 import {TraceTitle} from './TraceTitle.ts'
 import {writeTracePair} from './writeTracePair.ts'
@@ -27,6 +28,7 @@ export type TraceOptions = {
   traceCategory?: ReadonlyArray<string>
   traceExclude?: ReadonlyArray<string>
   tracePreset?: ReadonlyArray<TracePreset>
+  traceStopTimeout?: number
   userDataDir?: string
 }
 
@@ -70,9 +72,11 @@ export class TraceRecorder {
   private started = false
   private startedAt?: string
   private stopping?: Promise<string>
+  private readonly stopTimeout: number
   private readonly title: TraceTitle
 
   constructor(readonly browser: Browser, readonly options: TraceOptions = {}) {
+    this.stopTimeout = resolveTraceStopTimeout(options.traceStopTimeout)
     this.title = new TraceTitle(options.titleUpdates)
     const {promise, resolve, reject} = Promise.withResolvers<string>()
     this.finished = promise
@@ -239,25 +243,20 @@ export class TraceRecorder {
     const stoppedAt = new Date
     let stream: string | undefined
     try {
-      await session.send('Tracing.end')
-      const timeout = setTimeout(() => this.complete.reject(new Error('Timed out waiting for the browser to finish tracing.')), 30_000)
-      let event: Protocol.Tracing.TracingCompleteEvent
-      try {
-        event = await this.complete.promise
-      } finally {
-        clearTimeout(timeout)
-      }
+      const event = await finishTracing(session, this.complete.promise, this.stopTimeout)
       stream = event.stream
       if (!stream || event.traceFormat !== 'proto' || event.streamCompression !== 'gzip') {
         throw new Error('Browser did not return the requested gzip Perfetto stream.')
       }
+      console.error('Downloading the finalized trace…')
+      const timeout = this.stopTimeout
       const handle = stream
       async function *chunks() {
         while (true) {
           const chunk = await session.send('IO.read', {
             handle,
             size: 16 * 1024 * 1024,
-          })
+          }, {timeout})
           yield Buffer.from(chunk.data, chunk.base64Encoded ? 'base64' : 'utf8')
           if (chunk.eof) {
             return
@@ -266,6 +265,7 @@ export class TraceRecorder {
       }
       await pipeline(Readable.from(chunks()), createGunzip(), createWriteStream(proto))
       this.downloaded = true
+      console.error('Compressing Perfetto trace and MessagePack sidecar…')
       await writeTracePair(proto, this.output, this.consoleEvents, {
         ...this.metadata,
         RecordingId: crypto.randomUUID(),

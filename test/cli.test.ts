@@ -61,6 +61,9 @@ test('invalid inputs fail without launching', async () => {
     ['--trace-start', 'manual'],
     ['--trace-delay', '0'],
     ['--exit-after-trace'],
+    ['--trace-stop-timeout', '0'],
+    ['--trace', '--trace-stop-timeout', '-1'],
+    ['trace', '--trace-stop-timeout', 'NaN'],
     ['--trace', '--trace-start', 'invalid'],
     ['--trace', '--trace-delay', '-1'],
     ['trace', '--trace-delay', '-1'],
@@ -187,4 +190,11 @@ test('trace title updates default on and accept explicit false', async () => {
   }
   const help = await cli('trace', '--help')
   expect(help.stdout).toContain('--title-updates')
+})
+test('trace stop timeout is resolved in the launch plan', async () => {
+  for (const timeout of [undefined, 0, 600_000]) {
+    const result = await cli('--dump', '--executable-file', Bun.argv[0], '--trace', ...timeout === undefined ? [] : ['--trace-stop-timeout', String(timeout)])
+    expect(result.code).toBe(0)
+    expect((JSON.parse(result.stdout) as {traceStopTimeout: number}).traceStopTimeout).toBe(timeout ?? 300_000)
+  }
 })

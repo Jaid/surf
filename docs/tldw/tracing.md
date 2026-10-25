@@ -28,6 +28,14 @@ surf trace --port 9222 --output ./trace.msgpack.br --duration 10000 --reload
 
 The trace is browser-wide. Console events and optional reload belong to the first page target, or the page selected with `surf trace --target-id <id>`. The default trace buffer is 4,000,000,000 bytes; change it with `--buffer`.
 
+### Saving and finalization timeouts
+
+Enter requests a stop, but Chromium must still finalize its trace stream before Surf can download it. The old fixed 30-second wait could discard a recording even with plenty of buffer space remaining. Buffer fill is not export progress.
+
+`--trace-stop-timeout <milliseconds>` defaults to 300,000 (five minutes). It bounds the stop request plus the wait for Chromium's completion event, and separately each stream read. It overrides the ordinary CDP command timeout for these operations; it does not limit recording duration or local compression. Set it to 0 to disable these deadlines. Both launch-time tracing and `surf trace` support it.
+
+Surf prints the finalization, download, and compression stages, with elapsed-time reminders every ten seconds while waiting for Chromium. Keep the browser open until the saved-files message. A disconnected browser still fails promptly. With a disabled deadline, a stalled browser can wait indefinitely; closing it abandons the recording. Timeout/disconnection cleanup removes partial outputs, so increase the limit **before** recording, not after a failed save.
+
 ### Two-file trace format
 
 Each recording produces:

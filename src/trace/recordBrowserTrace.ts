@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer-core'
 import {integer} from '../browser/options.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
 import {resolveTraceCategories} from './categories.ts'
+import {resolveTraceStopTimeout} from './finishTracing.ts'
 import {TraceRecorder} from './TraceRecorder.ts'
 import {requireTraceInput, validateTraceStart, waitForTraceStart} from './waitForTraceStart.ts'
 
@@ -18,6 +19,7 @@ export const recordBrowserTrace = async (options: TraceOptions & TraceStartOptio
     integer(options.duration, 'duration', 1, 2_147_483_647)
   }
   resolveTraceCategories(options.tracePreset, options.traceCategory, options.traceExclude)
+  resolveTraceStopTimeout(options.traceStopTimeout)
   validateTraceStart(options)
   requireTraceInput(options)
   using stop = new StopRequest
