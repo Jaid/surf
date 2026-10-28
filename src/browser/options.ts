@@ -88,6 +88,9 @@ export const performanceArguments = (options: ResolvedLaunchOptions) => (options
   '--disable-renderer-backgrounding',
 ] : [])
 
+// Chromium ignores --app for non-web-safe schemes like about: and opens a regular tabbed window instead.
+const appPlaceholderUrl = 'data:,'
+
 export const browserArguments = (options: ResolvedLaunchOptions, userDataDir: string) => [
   '--no-first-run',
   '--no-default-browser-check',
@@ -100,5 +103,5 @@ export const browserArguments = (options: ResolvedLaunchOptions, userDataDir: st
   ...performanceArguments(options),
   ...options.args,
   ...options.kiosk ? ['--kiosk'] : [],
-  options.app ? `--app=${options.printLog.length ? 'about:blank' : options.url}` : (options.printLog.length ? 'about:blank' : options.url),
+  options.app ? `--app=${options.printLog.length ? appPlaceholderUrl : options.url}` : (options.printLog.length ? 'about:blank' : options.url),
 ]

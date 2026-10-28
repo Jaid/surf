@@ -211,7 +211,7 @@ test('print-log is repeatable, independent of tracing, and initializes before na
     printLog: Array<string>
   }
   expect(dump.printLog).toEqual(['console', 'network'])
-  expect(dump.args).toContain('--app=about:blank')
+  expect(dump.args).toContain('--app=data:,')
   expect(dump.navigateTo).toBe('https://example.com/')
   const help = await cli('trace', '--help')
   expect(help.stdout).toContain('--print-log')
