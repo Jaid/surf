@@ -19,22 +19,35 @@ test('controls extension appends to user extensions and is removed on disposal',
   }
   expect(await fs.pathExists(folder)).toBe(false)
 })
-test('menu state is pushed to the extension and clicks act like Enter', async () => {
+test('menu state is pushed to the extension and clicks act like Enter and Ctrl+C', async () => {
   await using controls = await SurfControls.create()
   const rejected = await fetch(controls.endpoint.replace(/^ws/, 'http').replace(/\/[^/]+$/, '/wrong'))
   expect(rejected.status).toBe(404)
   const socket = new WebSocket(controls.endpoint)
-  expect(await nextMessage(socket)).toEqual({visible: false})
+  expect(await nextMessage(socket)).toEqual({
+    trace: {visible: false},
+    end: {visible: false},
+  })
   const shown = nextMessage(socket)
   controls.show('stop')
   expect(await shown).toEqual({
-    title: 'Stop trace',
-    visible: true,
+    trace: {
+      title: 'Stop trace',
+      visible: true,
+    },
+    end: {visible: false},
   })
+  const endShown = nextMessage(socket)
+  controls.showEnd(true)
+  expect(await endShown).toMatchObject({end: {visible: true}})
   const entered = Promise.withResolvers<void>()
-  using _listener = controls.onEnter(entered.resolve)
+  const ended = Promise.withResolvers<void>()
+  using _enterListener = controls.on('enter', entered.resolve)
+  using _endListener = controls.on('end', ended.resolve)
   socket.send('keepalive')
   socket.send('enter')
   await entered.promise
+  socket.send('end')
+  await ended.promise
   socket.close()
 })

@@ -30,7 +30,7 @@ export const recordTraceSeries = async (
   })
   const {controls} = options
   const requested = Promise.withResolvers<void>()
-  const startListener = controls?.onEnter(requested.resolve)
+  const startListener = controls?.on('enter', requested.resolve)
   if (options.traceStart === 'manual') {
     controls?.show('start')
   }
@@ -45,7 +45,7 @@ export const recordTraceSeries = async (
     }
   }
   using input = new TraceInput
-  using _enterListener = controls?.onEnter(() => input.request())
+  using _enterListener = controls?.on('enter', () => input.request())
   const repeat = options.repeat && (process.stdin.isTTY || Boolean(controls)) && !options.exitAfterTrace
   const failed = Promise.withResolvers<never>()
   void failed.promise.catch(() => {})
@@ -70,7 +70,8 @@ export const recordTraceSeries = async (
       }
       active = new TraceRecorder(browser, options.traceOptions(index))
       await active.start()
-      controls?.show('stop')
+      // With --exit-after-trace, Enter and Ctrl+C both end the session, so only “End session” is offered.
+      controls?.show(options.exitAfterTrace ? 'hidden' : 'stop')
       const recorder = active
       if (options.duration) {
         timer = setTimeout(() => {

@@ -3,6 +3,8 @@ import {tmpdir} from 'node:os'
 import {join} from 'forward-slash-path'
 import fs from 'fs-extra'
 
+export type SurfControlsAction = 'end' | 'enter'
+
 export type SurfControlsState = 'hidden' | 'start' | 'stop'
 
 const titles = {
@@ -10,7 +12,7 @@ const titles = {
   stop: 'Stop trace',
 }
 
-/** Serves a context menu extension whose “Stop trace” item acts like Enter in the terminal. */
+/** Serves a context menu extension whose “Stop trace” and “End session” items act like Enter and Ctrl+C in the terminal. */
 export class SurfControls {
   static async create() {
     const rawFolder = await fs.mkdtemp(join(tmpdir(), 'surf-controls-'))
@@ -25,7 +27,11 @@ export class SurfControls {
       throw error
     }
   }
-  private readonly listeners = new Set<() => void>
+  private endVisible = false
+  private readonly listeners: Record<SurfControlsAction, Set<() => void>> = {
+    end: new Set,
+    enter: new Set,
+  }
   private readonly server: Bun.Server<undefined>
   private state: SurfControlsState = 'hidden'
   private readonly token = crypto.randomUUID()
@@ -47,8 +53,8 @@ export class SurfControls {
           socket.send(this.message())
         },
         message: (_socket, message) => {
-          if (message === 'enter') {
-            for (const listener of this.listeners) {
+          if (message === 'end' || message === 'enter') {
+            for (const listener of this.listeners[message]) {
               listener()
             }
           }
@@ -70,9 +76,9 @@ export class SurfControls {
     return args.with(index, `${args[index]},${this.folder}`)
   }
 
-  onEnter(listener: () => void): Disposable {
-    this.listeners.add(listener)
-    return {[Symbol.dispose]: () => this.listeners.delete(listener)}
+  on(action: SurfControlsAction, listener: () => void): Disposable {
+    this.listeners[action].add(listener)
+    return {[Symbol.dispose]: () => this.listeners[action].delete(listener)}
   }
 
   show(state: SurfControlsState) {
@@ -82,8 +88,16 @@ export class SurfControls {
     }
   }
 
+  showEnd(visible: boolean) {
+    if (visible !== this.endVisible) {
+      this.endVisible = visible
+      this.server.publish('state', this.message())
+    }
+  }
+
   async [Symbol.asyncDispose]() {
-    this.listeners.clear()
+    this.listeners.end.clear()
+    this.listeners.enter.clear()
     await this.server.stop(true)
     await fs.rm(this.folder, {
       recursive: true,
@@ -94,9 +108,12 @@ export class SurfControls {
   }
 
   private message() {
-    return JSON.stringify(this.state === 'hidden' ? {visible: false} : {
-      title: titles[this.state],
-      visible: true,
+    return JSON.stringify({
+      trace: this.state === 'hidden' ? {visible: false} : {
+        title: titles[this.state],
+        visible: true,
+      },
+      end: {visible: this.endVisible},
     })
   }
 }

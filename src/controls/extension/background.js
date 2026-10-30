@@ -1,16 +1,30 @@
 import {endpoint} from './config.js'
 
-const menuId = 'surf-trace'
+// Clicking an item sends its action, mirroring Enter and Ctrl+C in the terminal.
+const menus = {
+  trace: {
+    id: 'surf-trace',
+    action: 'enter',
+    title: 'Stop trace',
+  },
+  end: {
+    id: 'surf-end',
+    action: 'end',
+    title: 'End session',
+  },
+}
 const queue = []
 let socket
 let keepalive
 let state = {
-  title: 'Stop trace',
-  visible: false,
+  trace: {visible: false},
+  end: {visible: false},
 }
 
 const apply = () => {
-  chrome.contextMenus.update(menuId, state, () => void chrome.runtime.lastError)
+  for (const [key, menu] of Object.entries(menus)) {
+    chrome.contextMenus.update(menu.id, state[key], () => void chrome.runtime.lastError)
+  }
 }
 
 const connect = () => {
@@ -46,15 +60,19 @@ const send = message => {
 }
 
 chrome.contextMenus.removeAll(() => {
-  chrome.contextMenus.create({
-    id: menuId,
-    contexts: ['all'],
-    ...state,
-  }, apply)
+  for (const [key, menu] of Object.entries(menus)) {
+    chrome.contextMenus.create({
+      id: menu.id,
+      title: menu.title,
+      contexts: ['all'],
+      ...state[key],
+    }, apply)
+  }
 })
 chrome.contextMenus.onClicked.addListener(info => {
-  if (info.menuItemId === menuId) {
-    send('enter')
+  const menu = Object.values(menus).find(({id}) => id === info.menuItemId)
+  if (menu) {
+    send(menu.action)
   }
 })
 connect()

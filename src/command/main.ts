@@ -95,6 +95,8 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     ...options,
     args: controls.browserArguments(options.args),
   } : options)
+  using _endListener = controls?.on('end', () => stop.stop(130))
+  controls?.showEnd(true)
   console.log(JSON.stringify(session.info))
   if (stop.code !== undefined) {
     process.exitCode = stop.code

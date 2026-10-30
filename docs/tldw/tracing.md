@@ -50,7 +50,7 @@ The library's `recordBrowserTrace()` remains single-shot by default. Opt into in
 surf localhost:5173 --trace --surf-controls
 ```
 
-`--surf-controls` loads a small MV3 extension into the launched browser that adds **Stop trace** to the right-click menu. It acts like Enter in the terminal: while recording it stops and saves; afterward the item reads **Start trace** and starts the next recording (also the first one with `--trace-start manual`). The extension reaches Surf through a token-protected WebSocket on 127.0.0.1 and is deleted with the session. Since menu clicks replace Enter, repeated recordings also work without an interactive terminal. It requires launch-time `--trace` and a browser that honors `--load-extension` (Chromium and Brave do; recent Google Chrome builds ignore it).
+`--surf-controls` loads a small MV3 extension into the launched browser that adds **Stop trace** and **End session** to the right-click menu. **Stop trace** acts like Enter in the terminal: while recording it stops and saves; afterward the item reads **Start trace** and starts the next recording (also the first one with `--trace-start manual`). **End session** acts like Ctrl+C: it saves an active recording, then closes the browser. With `--exit-after-trace`, where both keys end the session, only **End session** is shown. The extension reaches Surf through a token-protected WebSocket on 127.0.0.1 and is deleted with the session. Since menu clicks replace Enter, repeated recordings also work without an interactive terminal. It requires launch-time `--trace` and a browser that honors `--load-extension` (Chromium and Brave do; recent Google Chrome builds ignore it).
 
 ### Saving and finalization timeouts
 
