@@ -79,6 +79,11 @@ const mainCommand = defineCommand({
     printLog: printLogFlag,
     tracePreset: tracePresetFlag,
     ...traceControlFlags,
+    surfControls: {
+      type: Boolean,
+      default: false,
+      description: 'Add Stop trace (and Start trace) to the browser’s context menu, acting like Enter',
+    },
     exitAfterTrace: {
       type: Boolean,
       default: false,

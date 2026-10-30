@@ -152,6 +152,14 @@ Bare `--trace` chooses a fresh tempy output for each recording. With an explicit
 
 The library's `recordBrowserTrace()` remains single-shot by default. Opt into interactive repetition with `repeat: true`; it returns the last saved sidecar after exiting. `TraceRecorder.readyForNext` resolves when Chromium has finalized the stream, before `finished` resolves; the browser must remain connected until outstanding downloads finish.
 
+### Context menu controls
+
+```powershell
+surf localhost:5173 --trace --surf-controls
+```
+
+`--surf-controls` loads a small MV3 extension into the launched browser that adds **Stop trace** to the right-click menu. It acts like Enter in the terminal: while recording it stops and saves; afterward the item reads **Start trace** and starts the next recording (also the first one with `--trace-start manual`). The extension reaches Surf through a token-protected WebSocket on 127.0.0.1 and is deleted with the session. Since menu clicks replace Enter, repeated recordings also work without an interactive terminal. It requires launch-time `--trace` and a browser that honors `--load-extension` (Chromium and Brave do; recent Google Chrome builds ignore it).
+
 ### Saving and finalization timeouts
 
 Enter requests a stop, but Chromium must still finalize its trace stream before Surf can download it. The old fixed 30-second wait could discard a recording even with plenty of buffer space remaining. Buffer fill is not export progress.

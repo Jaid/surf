@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Surf controls",
+  "version": "1.0.0",
+  "description": "Context menu controls for the Surf session that launched this browser",
+  "permissions": ["contextMenus"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

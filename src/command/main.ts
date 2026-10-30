@@ -8,6 +8,7 @@ import {launchDetached} from '../browser/launchDetached.ts'
 import {launchUnmanaged, resolveUnmanagedOptions, unmanagedArguments} from '../browser/launchUnmanaged.ts'
 import {browserArguments, integer, resolveOptions} from '../browser/options.ts'
 import {resolveExecutable} from '../browser/resolveExecutable.ts'
+import {SurfControls} from '../controls/SurfControls.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
 import {resolveTraceCategories} from '../trace/categories.ts'
 import {resolveTraceStopTimeout} from '../trace/finishTracing.ts'
@@ -34,8 +35,8 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (!traceOutput && flags.tracePreset.length) {
     throw new Error('--trace-preset requires --trace.')
   }
-  if (!traceOutput && (flags.traceCategory.length || flags.traceExclude.length || flags.traceStart !== undefined || flags.traceDelay !== undefined || flags.traceStopTimeout !== undefined || flags.exitAfterTrace)) {
-    throw new Error('Trace category, start, delay, stop timeout, and exit options require --trace.')
+  if (!traceOutput && (flags.traceCategory.length || flags.traceExclude.length || flags.traceStart !== undefined || flags.traceDelay !== undefined || flags.traceStopTimeout !== undefined || flags.exitAfterTrace || flags.surfControls)) {
+    throw new Error('Trace category, start, delay, stop timeout, exit, and Surf controls options require --trace.')
   }
   const traceStopTimeout = resolveTraceStopTimeout(flags.traceStopTimeout)
   validateTraceStart(flags)
@@ -57,7 +58,10 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     const executable = await resolveExecutable(options.executableFile)
     console.log(JSON.stringify({
       executable,
-      args: flags.unmanaged ? unmanagedArguments(options, input.port !== undefined) : browserArguments(options, options.userDataDir ?? '<temporary-user-data-dir>'),
+      args: flags.unmanaged ? unmanagedArguments(options, input.port !== undefined) : browserArguments({
+        ...options,
+        args: flags.surfControls ? [...options.args, '--load-extension=<surf-controls-extension>'] : options.args,
+      }, options.userDataDir ?? '<temporary-user-data-dir>'),
       temporary: !flags.unmanaged && !options.userDataDir,
       detached: flags.detached || flags.unmanaged,
       unmanaged: flags.unmanaged,
@@ -72,6 +76,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       traceStart: traceOutput ? flags.traceStart ?? 'immediate' : undefined,
       traceDelay: traceOutput ? flags.traceDelay ?? 0 : undefined,
       exitAfterTrace: flags.exitAfterTrace,
+      surfControls: flags.surfControls,
     }, null, 2))
     return
   }
@@ -85,7 +90,11 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   }
   requireTraceInput(flags)
   using stop = new StopRequest
-  await using session = await BrowserSession.launch(options)
+  await using controls = flags.surfControls ? await SurfControls.create() : undefined
+  await using session = await BrowserSession.launch(controls ? {
+    ...options,
+    args: controls.browserArguments(options.args),
+  } : options)
   console.log(JSON.stringify(session.info))
   if (stop.code !== undefined) {
     process.exitCode = stop.code
@@ -94,6 +103,7 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (traceOutput) {
     const result = await recordTraceSeries(session.browser, {
       ...flags,
+      controls,
       owned: true,
       repeat: true,
       traceOptions: index => ({

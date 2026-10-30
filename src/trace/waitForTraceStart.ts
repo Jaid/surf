@@ -25,11 +25,12 @@ export const requireTraceInput = (options: TraceStartOptions, input: NodeJS.Read
   }
 }
 
-/** Returns an interruption exit code, or undefined when recording may begin. */
+/** Returns an interruption exit code, or undefined when recording may begin. `requested` starts a manual recording like Enter. */
 export const waitForTraceStart = async (
   options: TraceStartOptions,
   interrupted: Promise<number>,
   input: NodeJS.ReadStream = process.stdin,
+  requested?: Promise<void>,
 ): Promise<number | undefined> => {
   validateTraceStart(options)
   requireTraceInput(options, input)
@@ -48,7 +49,7 @@ export const waitForTraceStart = async (
     input.resume()
     try {
       console.error('Press Enter to start tracing, or Ctrl+C to cancel without recording.')
-      const code = await Promise.race([interrupted, ready.promise])
+      const code = await Promise.race([interrupted, ready.promise, ...requested ? [requested] : []])
       if (code !== undefined) {
         return code
       }

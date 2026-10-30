@@ -1,3 +1,4 @@
+import type {SurfControls} from '../controls/SurfControls.ts'
 import type {TraceOptions} from './TraceRecorder.ts'
 import type {TraceStartOptions} from './waitForTraceStart.ts'
 import type {Browser} from 'puppeteer-core'
@@ -9,6 +10,7 @@ import {waitForTraceStart} from './waitForTraceStart.ts'
 export const recordTraceSeries = async (
   browser: Browser,
   options: TraceStartOptions & {
+    controls?: SurfControls
     duration?: number
     exitAfterTrace?: boolean
     owned?: boolean
@@ -26,7 +28,16 @@ export const recordTraceSeries = async (
     state.code = value
     return value
   })
-  const cancelled = await waitForTraceStart(options, stopped)
+  const {controls} = options
+  const requested = Promise.withResolvers<void>()
+  const startListener = controls?.onEnter(requested.resolve)
+  if (options.traceStart === 'manual') {
+    controls?.show('start')
+  }
+  const cancelled = await waitForTraceStart(options, stopped, process.stdin, requested.promise).finally(() => {
+    startListener?.[Symbol.dispose]()
+    controls?.show('hidden')
+  })
   if (cancelled !== undefined || getCode() !== undefined) {
     return {
       code: cancelled ?? state.code,
@@ -34,7 +45,8 @@ export const recordTraceSeries = async (
     }
   }
   using input = new TraceInput
-  const repeat = options.repeat && process.stdin.isTTY && !options.exitAfterTrace
+  using _enterListener = controls?.onEnter(() => input.request())
+  const repeat = options.repeat && (process.stdin.isTTY || Boolean(controls)) && !options.exitAfterTrace
   const failed = Promise.withResolvers<never>()
   void failed.promise.catch(() => {})
   const jobs: Array<Promise<string>> = []
@@ -58,6 +70,7 @@ export const recordTraceSeries = async (
       }
       active = new TraceRecorder(browser, options.traceOptions(index))
       await active.start()
+      controls?.show('stop')
       const recorder = active
       if (options.duration) {
         timer = setTimeout(() => {
@@ -76,12 +89,14 @@ export const recordTraceSeries = async (
       if (getCode() !== undefined || !repeat || action.kind === 'end') {
         break
       }
+      controls?.show('start')
       await Promise.race([recorder.readyForNext, failed.promise])
       if (getCode() !== undefined) {
         break
       }
       console.error('Press Enter to start another trace (also while saving); Ctrl+C exits.')
       const next = await input.wait(Promise.race([stopped, failed.promise]))
+      controls?.show('hidden')
       if (next.kind !== 'enter' || getCode() !== undefined) {
         break
       }
@@ -92,6 +107,7 @@ export const recordTraceSeries = async (
       output: await jobs.at(-1),
     }
   } finally {
+    controls?.show('hidden')
     clearTimeout(timer)
     if (active) {
       if (active.isStopping) {
