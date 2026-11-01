@@ -222,7 +222,7 @@ test('trace stop timeout is resolved in the launch plan', async () => {
   for (const timeout of [undefined, 0, 600_000]) {
     const result = await cli('--dump', '--executable-file', Bun.argv[0], '--trace', ...timeout === undefined ? [] : ['--trace-stop-timeout', String(timeout)])
     expect(result.code).toBe(0)
-    expect((JSON.parse(result.stdout) as {traceStopTimeout: number}).traceStopTimeout).toBe(timeout ?? 300_000)
+    expect((JSON.parse(result.stdout) as {traceStopTimeout: number}).traceStopTimeout).toBe(timeout ?? 900_000)
   }
 })
 test('print-log is repeatable, independent of tracing, and initializes before navigation', async () => {

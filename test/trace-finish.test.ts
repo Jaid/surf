@@ -14,8 +14,8 @@ const session = (send = mock(async () => ({}))) => ({
   send,
   cdp: {send} as unknown as Pick<CDPSession, 'send'>,
 })
-test('finalization timeout defaults to five minutes and accepts zero', () => {
-  expect(resolveTraceStopTimeout()).toBe(300_000)
+test('finalization timeout defaults to fifteen minutes and accepts zero', () => {
+  expect(resolveTraceStopTimeout()).toBe(900_000)
   expect(resolveTraceStopTimeout(0)).toBe(0)
   for (const value of [-1, 0.5, Number.NaN, Infinity, 2_147_483_648]) {
     expect(() => resolveTraceStopTimeout(value)).toThrow('trace-stop-timeout')

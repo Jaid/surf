@@ -2,7 +2,7 @@ import type {CDPSession, Protocol} from 'puppeteer-core'
 
 import {integer} from '../browser/options.ts'
 
-export const resolveTraceStopTimeout = (value = 300_000) => integer(value, 'trace-stop-timeout', 0, 2_147_483_647)
+export const resolveTraceStopTimeout = (value = 900_000) => integer(value, 'trace-stop-timeout', 0, 2_147_483_647)
 
 // The command acknowledgement is not the trace: Chromium emits tracingComplete
 // separately, after finalizing its stream. Bound both with one deadline.

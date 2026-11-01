@@ -4,7 +4,7 @@ import {parseTraceStart} from '../trace/waitForTraceStart.ts'
 export const traceControlFlags = {
   traceStopTimeout: {
     type: Number,
-    description: 'Trace finalization / per-read timeout in milliseconds (default 300000; 0 disables)',
+    description: 'Trace finalization / per-read timeout in milliseconds (default 900000; 0 disables)',
   },
   titleUpdates: {
     type: Boolean,
