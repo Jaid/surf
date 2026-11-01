@@ -4,4 +4,4 @@ Override with `--cache-folder`. Defaults:
 - macOS: `~/Library/Caches/surf`
 - Linux: `${XDG_CACHE_HOME:-~/.cache}/surf`
 
-Icons, the converter, and detached session logs live here; disposable browser profiles do not.
+Icons, the converter, and background session logs live here; disposable browser profiles do not.

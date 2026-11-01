@@ -6,7 +6,7 @@ import fs from 'fs-extra'
 import puppeteer from 'puppeteer-core'
 
 import {BrowserSession} from '../src/browser/BrowserSession.ts'
-import {launchDetached} from '../src/browser/launchDetached.ts'
+import {launchBackground} from '../src/browser/launchBackground.ts'
 
 const executableFile = Bun.env.SURF_TEST_BROWSER
 const integration = test.skipIf(!executableFile)
@@ -54,10 +54,10 @@ integration('persistent profile survives and duplicate launch does not own the o
     })
   }
 }, 30_000)
-integration('detached worker reports readiness and cleans its profile after browser close', async () => {
-  const cacheFolder = await fs.mkdtemp(join(tmpdir(), 'surf-detached-test-'))
+integration('background worker reports readiness and cleans its profile after browser close', async () => {
+  const cacheFolder = await fs.mkdtemp(join(tmpdir(), 'surf-background-test-'))
   try {
-    const info = await launchDetached({
+    const info = await launchBackground({
       executableFile,
       cacheFolder,
       url: 'about:blank',
@@ -84,10 +84,10 @@ integration('detached worker reports readiness and cleans its profile after brow
     })
   }
 }, 45_000)
-integration('detached CLI exits while its browser remains usable', async () => {
-  const cacheFolder = await fs.mkdtemp(join(tmpdir(), 'surf-detached-cli-test-'))
+integration('background CLI exits while its browser remains usable', async () => {
+  const cacheFolder = await fs.mkdtemp(join(tmpdir(), 'surf-background-cli-test-'))
   try {
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/main.ts'), 'about:blank', '--detached', '--cache-folder', cacheFolder, '--executable-file', executableFile!, '--', '--headless=new'], {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, '../src/main.ts'), 'about:blank', '--background', '--cache-folder', cacheFolder, '--executable-file', executableFile!, '--', '--headless=new'], {
       stdout: 'pipe',
       stderr: 'pipe',
     })

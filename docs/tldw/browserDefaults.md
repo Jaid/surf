@@ -7,7 +7,7 @@ Sandboxing, download safety, self-XSS protection, syncing, and ordinary browser 
 Every managed session has a loopback CDP endpoint. `--port 0` (default) selects a free port; use a fixed port when another tool needs to attach:
 
 ```powershell
-surf localhost:5173 --port 9222 --detached
+surf localhost:5173 --port 9222 --background
 ```
 
 CDP grants full control over the session. Do not expose its port outside loopback or use it with a profile whose data you do not want local debugging clients to access.

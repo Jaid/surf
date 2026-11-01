@@ -18,11 +18,11 @@ bun link
 
 ```powershell
 # Startup/login app: normal browser profile, no Surf worker
-surf pro.x.com --app --unmanaged
+surf pro.x.com --app --detached
 
 # Same browser/profile as other apps; existing login sessions are reused
-surf "github.com/repos?q=sort%3Aupdated+owner%3Ajaid,jaidlab" --app --unmanaged
-surf discord.com/channels/@me --app --unmanaged --profile profile_jaid
+surf "github.com/repos?q=sort%3Aupdated+owner%3Ajaid,jaidlab" --app --detached
+surf discord.com/channels/@me --app --detached --profile profile_jaid
 
 # Coupled browser, disposable profile
 surf example.com
@@ -30,14 +30,14 @@ surf example.com
 # Chromeless game/app window; keep Surf attached
 surf localhost:5173 --app --performance
 
-# Detached app with a theme-aware taskbar icon
-surf github.com --app --better-icon --detached
+# Background-supervised app with a theme-aware taskbar icon
+surf github.com --app --better-icon --background
 
 # Reuse a persistent data directory, or create it if missing
 surf example.com --user-data-dir C:/Users/jaid/surf/work --profile "Profile 1"
 
 # Fullscreen is separate from chromeless app mode
-surf example.com --kiosk --detached
+surf example.com --kiosk --background
 
 # Inspect the executable and argument vector without creating a profile
 surf example.com --app --dump
@@ -60,13 +60,13 @@ Use `--switch=value` for switches with values. Surf rejects passthrough switches
 | Setting | Behavior |
 | --- | --- |
 | Default | Surf waits for the browser process. Ctrl+C closes it and cleans up. |
-| `--unmanaged` | Spawn directly and exit: no worker, CDP connection, icon helper, or cleanup. |
-| `--detached` | Surf returns after startup. A background Surf worker supervises the browser and performs cleanup. |
+| `--background`, `-b` | Surf returns after startup. A background Surf worker supervises the browser and performs cleanup. |
+| `--detached`, `-d` | Spawn directly and exit: no worker, CDP connection, icon helper, or cleanup. |
 | No `--user-data-dir` (managed) | A unique OS-temporary profile is created and removed after the browser exits. |
 | Explicit `--user-data-dir` | The directory is created if necessary and **never deleted by Surf**. |
 | `--profile` | A directory name inside the user data directory; defaults to `Default`. |
 
-Paths can be relative to the current working directory or start with `~/`.
+Coupled (default) and `--background` sessions are *managed*: Surf owns the browser process. `--background` and `--detached` cannot be combined. Paths can be relative to the current working directory or start with `~/`.
 
 **Managed sessions:** A data directory must not already be open in another browser process, including another Surf session. Surf requires an independently owned process: it does not attach to or close your everyday browser. Chromium itself enforces profile exclusivity; a handoff to an existing process is treated as a failed launch. Recent Chrome also refuses remote debugging with its default everyday data directory; use a dedicated directory.
 
@@ -74,19 +74,19 @@ Existing profile files are not rewritten by Surf. Empty/new managed directories 
 
 Normal shutdown is graceful, with a process-tree termination fallback after 10 seconds if the browser is stuck. OS crashes, force-killing Surf, and power loss can leave temporary profiles behind. Do not delete a profile while its browser is running.
 
-A successful managed launch prints one JSON object to stdout with the browser PID, executable, URL, data directory, temporary status, and CDP WebSocket URL. Detached launches also report their log file. Diagnostics go to stderr or the detached session log.
+A successful managed launch prints one JSON object to stdout with the browser PID, executable, URL, data directory, temporary status, and CDP WebSocket URL. Background launches also report their log file. Diagnostics go to stderr or the background session log.
 
-Windows workers break away from the launching console and its Job Object. Detached session status/logs remain under `<cache>/sessions/<id>/`; the browser's temporary data directory is still removed. Completed session directories can be deleted when their logs are no longer needed.
+Windows workers break away from the launching console and its Job Object. Background session status/logs remain under `<cache>/sessions/<id>/`; the browser's temporary data directory is still removed. Completed session directories can be deleted when their logs are no longer needed.
 
-### Unmanaged startup apps
+### Detached startup apps
 
-Use `--unmanaged` for ordinary, long-lived apps such as the kiosk entries in `hello`. It implies detachment; `--detached` is unnecessary. The browser’s normal data directory is used unless `--user-data-dir` selects an explicit persistent directory. Surf never creates throwaway profiles or changes profile preferences in this mode.
+Use `--detached` for ordinary, long-lived apps such as the app entries in `hello`. The browser’s normal data directory is used unless `--user-data-dir` selects an explicit persistent directory. Surf never creates throwaway profiles or changes profile preferences in this mode.
 
 Multiple app launches can share a running browser and its login sessions. Chromium handles the handoff; Surf neither connects to nor owns that browser. No Surf process remains after launch, and no session directory or log is created. On Windows the browser is launched independently of the terminal and its Job Object.
 
-The JSON result has `mode: "unmanaged"` and `spawnedPid`, not an owned browser `pid`, debugging URL, or log path. The spawned process may exit immediately after handing the request to an existing browser. Success means the OS accepted the spawn, not that a window or page finished loading; later browser failures are not monitored.
+The JSON result has `mode: "detached"` and `spawnedPid`, not an owned browser `pid`, debugging URL, or log path. The spawned process may exit immediately after handing the request to an existing browser. Success means the OS accepted the spawn, not that a window or page finished loading; later browser failures are not monitored.
 
-`--trace` and `--better-icon` are rejected rather than silently starting supervision. Use managed sessions when those features are needed. Unmanaged launches only add the window/profile flags and explicitly requested performance or passthrough switches; they do not alter browser background mode or enable remote debugging by default. Explicit `--port` adds a loopback debugging endpoint without a worker or CDP connection; Surf does not wait for it or discover its WebSocket URL. Browser restrictions on debugging its normal data directory still apply. When handing off to an existing browser, startup-only flags such as the debugging port cannot reconfigure that process.
+`--trace` and `--better-icon` are rejected rather than silently starting supervision. Use managed sessions when those features are needed. Detached launches only add the window/profile flags and explicitly requested performance or passthrough switches; they do not alter browser background mode or enable remote debugging by default. Explicit `--port` adds a loopback debugging endpoint without a worker or CDP connection; Surf does not wait for it or discover its WebSocket URL. Browser restrictions on debugging its normal data directory still apply. When handing off to an existing browser, startup-only flags such as the debugging port cannot reconfigure that process.
 
 ## browser defaults
 
@@ -99,7 +99,7 @@ Sandboxing, download safety, self-XSS protection, syncing, and ordinary browser 
 Every managed session has a loopback CDP endpoint. `--port 0` (default) selects a free port; use a fixed port when another tool needs to attach:
 
 ```powershell
-surf localhost:5173 --port 9222 --detached
+surf localhost:5173 --port 9222 --background
 ```
 
 CDP grants full control over the session. Do not expose its port outside loopback or use it with a profile whose data you do not want local debugging clients to access.
@@ -132,7 +132,7 @@ surf trace --port 9222
 surf trace --port 9222 --output ./trace.msgpack.br --duration 10000 --reload
 ```
 
-`surf trace` never closes the browser. In an interactive terminal, Enter saves and another Enter starts a fresh recording; Ctrl+C saves and detaches. Without an interactive terminal, it exits after one recording. The optional duration stops each recording. Launch-time `--trace` cannot be combined with `--detached`; use this separate command instead.
+`surf trace` never closes the browser. In an interactive terminal, Enter saves and another Enter starts a fresh recording; Ctrl+C saves and detaches. Without an interactive terminal, it exits after one recording. The optional duration stops each recording. Launch-time `--trace` cannot be combined with `--background` or `--detached`; use this separate command instead.
 
 The trace is browser-wide. Console events and optional reload belong to the first page target, or the page selected with `surf trace --target-id <id>`. The default trace buffer is 4,000,000,000 bytes; change it with `--buffer`.
 
@@ -211,7 +211,7 @@ Library `stop()`/`finished` and `recordBrowserTrace()` still return the **sideca
 
 Decompress `.pftrace.br` to `.pftrace` before opening it in Perfetto UI. Surf's sidecar is not automatically loaded into that UI. Temporary disk space is needed for the raw protobuf and compressed outputs, but not converted JSON.
 
-The attachment CLI's `--cache-folder` and recording library's `cacheFolder` option were removed with traceconv. Launch-time `--cache-folder` remains for icons and detached-session logs. Surf no longer counts decoded browser events; empty native streams fail, and nonempty protobuf is preserved without conversion.
+The attachment CLI's `--cache-folder` and recording library's `cacheFolder` option were removed with traceconv. Launch-time `--cache-folder` remains for icons and background-session logs. Surf no longer counts decoded browser events; empty native streams fail, and nonempty protobuf is preserved without conversion.
 
 ### Categories and presets
 
@@ -320,7 +320,7 @@ Logging follows the first page and its CDP-reported frame traffic across navigat
 
 Printing is independent of trace categories: excluding `surf.console` does not disable console printing, and printing does not enable trace collectors. Logging continues while traces finalize/save and between repeated recordings.
 
-`--detached` and `--unmanaged` are incompatible because Surf would no longer be attached to your stdout. Use a coupled browser, or attach with `surf trace --port …`. Library launch/attachment options accept `printLog: ['console', 'network']`.
+`--background` and `--detached` are incompatible because Surf would no longer be attached to your stdout. Use a coupled browser, or attach with `surf trace --port …`. Library launch/attachment options accept `printLog: ['console', 'network']`.
 
 ## better taskbar icons
 
@@ -344,12 +344,12 @@ Override with `--cache-folder`. Defaults:
 - macOS: `~/Library/Caches/surf`
 - Linux: `${XDG_CACHE_HOME:-~/.cache}/surf`
 
-Icons, the converter, and detached session logs live here; disposable browser profiles do not.
+Icons, the converter, and background session logs live here; disposable browser profiles do not.
 
 ## library
 
 ```ts
-import {launchBrowser, launchDetached, TraceRecorder} from 'surf'
+import {launchBackground, launchBrowser, TraceRecorder} from 'surf'
 
 await using session = await launchBrowser({
   url: 'http://localhost:5173',
@@ -363,9 +363,9 @@ await session.exited
 
 `session.close()` performs the same idempotent cleanup. Direct library sessions should be closed or scoped with `await using`; CLI signal handling is not installed by `launchBrowser`.
 
-`launchDetached(options)` resolves to the same launch information plus a log path and leaves the background worker responsible for cleanup. `TraceRecorder` offers `start()`, `stop()`, `finished`, and async disposal for recording an existing Puppeteer browser connection. `recordBrowserTrace(options)` exposes the interactive/timed attach workflow.
+`launchBackground(options)` resolves to the same launch information plus a log path and leaves the background worker responsible for cleanup. `TraceRecorder` offers `start()`, `stop()`, `finished`, and async disposal for recording an existing Puppeteer browser connection. `recordBrowserTrace(options)` exposes the interactive/timed attach workflow.
 
-`launchUnmanaged({url, app: true})` is the worker-free alternative for startup apps. It submits the browser launch request and returns `UnmanagedInfo`; it has no session handle or disposal requirement. Without `userDataDir`, the browser chooses its normal data directory. The returned `spawnedPid` may be a short-lived handoff process, not the process hosting the window.
+`launchDetached({url, app: true})` is the worker-free alternative for startup apps. It submits the browser launch request and returns `DetachedInfo`; it has no session handle or disposal requirement. Without `userDataDir`, the browser chooses its normal data directory. The returned `spawnedPid` may be a short-lived handoff process, not the process hosting the window.
 
 Both `TraceRecorder` and `recordBrowserTrace` accept `tracePreset: ['webgpu_game', 'network']`. Omit it or pass an empty array for standard categories. `TracePreset`, `tracePresets`, `standardTraceCategories`, and `resolveTraceCategories()` are exported for inspecting the hardcoded configuration.
 
@@ -377,7 +377,7 @@ Recordings now produce a native `.pftrace.br` and a versioned `.msgpack.br` side
 
 Maintain README content in `docs/tldw` and package metadata in `package.json`. Do not edit `readme.md` directly. Run `bun run readme` (or `bun tldw`) to regenerate it. CI checks that the generated file is up to date.
 
-The CLI follows `src/main.ts → makeCli.ts → command/mainCommand.ts → command/main.ts`, using Clerc's core and selected plugin packages. Browser ownership, profile cleanup, detached launching, icons, and tracing are separate modules.
+The CLI follows `src/main.ts → makeCli.ts → command/mainCommand.ts → command/main.ts`, using Clerc's core and selected plugin packages. Browser ownership, profile cleanup, background and detached launching, icons, and tracing are separate modules.
 
 ```powershell
 # Real headless-browser tests, including trace conversion and detachment
@@ -423,6 +423,6 @@ bun run test
 Copyright © 2026, Jaid \<jaid.jsx@gmail.com> (https://github.com/jaid)
 
 <!--
-readme generated with tldw v9.9.0 from ./docs/tldw
+readme generated with tldw v9.9.0 from ./docs and ./docs/tldw
 github.com/Jaid/tldw
 -->

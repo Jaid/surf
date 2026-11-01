@@ -22,4 +22,4 @@ Logging follows the first page and its CDP-reported frame traffic across navigat
 
 Printing is independent of trace categories: excluding `surf.console` does not disable console printing, and printing does not enable trace collectors. Logging continues while traces finalize/save and between repeated recordings.
 
-`--detached` and `--unmanaged` are incompatible because Surf would no longer be attached to your stdout. Use a coupled browser, or attach with `surf trace --port …`. Library launch/attachment options accept `printLog: ['console', 'network']`.
+`--background` and `--detached` are incompatible because Surf would no longer be attached to your stdout. Use a coupled browser, or attach with `surf trace --port …`. Library launch/attachment options accept `printLog: ['console', 'network']`.

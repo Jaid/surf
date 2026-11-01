@@ -24,7 +24,7 @@ surf trace --port 9222
 surf trace --port 9222 --output ./trace.msgpack.br --duration 10000 --reload
 ```
 
-`surf trace` never closes the browser. In an interactive terminal, Enter saves and another Enter starts a fresh recording; Ctrl+C saves and detaches. Without an interactive terminal, it exits after one recording. The optional duration stops each recording. Launch-time `--trace` cannot be combined with `--detached`; use this separate command instead.
+`surf trace` never closes the browser. In an interactive terminal, Enter saves and another Enter starts a fresh recording; Ctrl+C saves and detaches. Without an interactive terminal, it exits after one recording. The optional duration stops each recording. Launch-time `--trace` cannot be combined with `--background` or `--detached`; use this separate command instead.
 
 The trace is browser-wide. Console events and optional reload belong to the first page target, or the page selected with `surf trace --target-id <id>`. The default trace buffer is 4,000,000,000 bytes; change it with `--buffer`.
 
@@ -103,7 +103,7 @@ Library `stop()`/`finished` and `recordBrowserTrace()` still return the **sideca
 
 Decompress `.pftrace.br` to `.pftrace` before opening it in Perfetto UI. Surf's sidecar is not automatically loaded into that UI. Temporary disk space is needed for the raw protobuf and compressed outputs, but not converted JSON.
 
-The attachment CLI's `--cache-folder` and recording library's `cacheFolder` option were removed with traceconv. Launch-time `--cache-folder` remains for icons and detached-session logs. Surf no longer counts decoded browser events; empty native streams fail, and nonempty protobuf is preserved without conversion.
+The attachment CLI's `--cache-folder` and recording library's `cacheFolder` option were removed with traceconv. Launch-time `--cache-folder` remains for icons and background-session logs. Surf no longer counts decoded browser events; empty native streams fail, and nonempty protobuf is preserved without conversion.
 
 ### Categories and presets
 

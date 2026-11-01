@@ -1,4 +1,4 @@
-import type {UnmanagedInfo} from '../src/browser/launchUnmanaged.ts'
+import type {DetachedInfo} from '../src/browser/launchDetached.ts'
 
 import {expect, test} from 'bun:test'
 import {tmpdir} from 'node:os'
@@ -15,7 +15,7 @@ const launch = async (url: string, folder: string, headless: boolean) => {
     join(import.meta.dir, '../src/main.ts'),
     url,
     '--app',
-    '--unmanaged',
+    '--detached',
     '--executable-file',
     executableFile!,
     '--user-data-dir',
@@ -34,7 +34,7 @@ const launch = async (url: string, folder: string, headless: boolean) => {
     const [code, stdout, stderr] = await Promise.all([child.exited, output.text(), errors.text()])
     expect(stderr).toBe('')
     expect(code).toBe(0)
-    return JSON.parse(stdout) as UnmanagedInfo
+    return JSON.parse(stdout) as DetachedInfo
   } finally {
     clearTimeout(timer)
   }
@@ -88,20 +88,20 @@ const removeFolder = async (folder: string) => {
     }
   }
 }
-integration('unmanaged CLI exits without a worker, profile cleanup, or CDP endpoint', async () => {
-  const folder = await fs.mkdtemp(join(tmpdir(), 'surf-unmanaged-test-'))
-  let info: UnmanagedInfo | undefined
+integration('detached CLI exits without a worker, profile cleanup, or CDP endpoint', async () => {
+  const folder = await fs.mkdtemp(join(tmpdir(), 'surf-detached-test-'))
+  let info: DetachedInfo | undefined
   let loaded = false
   const server = Bun.serve({
     port: 0,
     fetch() {
       loaded = true
-      return new Response('<title>Surf unmanaged test</title>', {headers: {'content-type': 'text/html'}})
+      return new Response('<title>Surf detached test</title>', {headers: {'content-type': 'text/html'}})
     },
   })
   try {
     info = await launch(server.url.href, folder, true)
-    expect(info.mode).toBe('unmanaged')
+    expect(info.mode).toBe('detached')
     expect(info.temporary).toBe(false)
     expect(info).not.toHaveProperty('webSocketDebuggerUrl')
     expect(info).not.toHaveProperty('logFile')
@@ -119,17 +119,17 @@ integration('unmanaged CLI exits without a worker, profile cleanup, or CDP endpo
     await removeFolder(folder)
   }
 }, 45_000)
-nativeIntegration('unmanaged app launches hand off to the same running persistent browser', async () => {
-  const folder = await fs.mkdtemp(join(tmpdir(), 'surf-unmanaged-handoff-'))
+nativeIntegration('detached app launches hand off to the same running persistent browser', async () => {
+  const folder = await fs.mkdtemp(join(tmpdir(), 'surf-detached-handoff-'))
   const requests = new Set<string>
-  const launches: Array<UnmanagedInfo> = []
+  const launches: Array<DetachedInfo> = []
   const server = Bun.serve({
     port: 0,
     fetch(request) {
       const requestUrl = new URL(request.url)
       const path = requestUrl.pathname
       requests.add(path)
-      return new Response('<title>Surf unmanaged handoff test</title>', {headers: {'content-type': 'text/html'}})
+      return new Response('<title>Surf detached handoff test</title>', {headers: {'content-type': 'text/html'}})
     },
   })
   try {

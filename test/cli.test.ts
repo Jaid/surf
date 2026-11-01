@@ -48,17 +48,19 @@ test('invalid inputs fail without launching', async () => {
   for (const args of [
     ['--unknown'],
     ['--print-log', 'unknown'],
-    ['--print-log', 'console', '--detached'],
-    ['--print-log', 'network', '--unmanaged'],
+    ['--print-log', 'console', '--background'],
+    ['--print-log', 'network', '--detached'],
+    ['--background', '--detached'],
+    ['-b', '-d'],
     ['trace', '--print-log', 'unknown'],
     ['first.com', 'second.com'],
     ['first.com', '--url', 'second.com'],
     ['--port', '65536'],
     ['--port', 'nan'],
     ['--app', '--kiosk'],
-    ['--trace', 'out.msgpack.br', '--detached'],
+    ['--trace', 'out.msgpack.br', '--background'],
+    ['--trace', '--background'],
     ['--trace', '--detached'],
-    ['--trace', '--unmanaged'],
     ['--duration', '10'],
     ['--trace-category', 'gpu'],
     ['--trace-exclude', 'surf.console'],
@@ -77,9 +79,10 @@ test('invalid inputs fail without launching', async () => {
     ['--trace', 'out.msgpack.br', '--trace-preset', 'missing'],
     ['trace', '--trace-preset', 'missing'],
     ['trace', '--trace-preset'],
-    ['--unmanaged', '--trace', 'out.msgpack.br'],
-    ['--unmanaged', '--app', '--better-icon'],
-    ['--unmanaged', '--port', '-1'],
+    ['--detached', '--trace', 'out.msgpack.br'],
+    ['--detached', '--app', '--better-icon'],
+    ['--detached', '--port', '-1'],
+    ['--unmanaged'],
     ['--', '--user-data-dir=elsewhere'],
     ['trace', 'unexpected'],
     ['trace', '--duration', '0'],
@@ -89,39 +92,59 @@ test('invalid inputs fail without launching', async () => {
   }
 })
 test('explicit false booleans stay false', async () => {
-  const result = await cli('--dump', '--executable-file', Bun.argv[0], '--app=false', '--better-icon=false', '--detached=false')
+  const result = await cli('--dump', '--executable-file', Bun.argv[0], '--app=false', '--better-icon=false', '--background=false', '--detached=false')
   expect(result.code).toBe(0)
   const dump = JSON.parse(result.stdout) as {
     args: Array<string>
+    background: boolean
     betterIcon: boolean
     detached: boolean
   }
+  expect(dump.background).toBe(false)
   expect(dump.detached).toBe(false)
   expect(dump.betterIcon).toBe(false)
   expect(dump.args.some(arg => arg.startsWith('--app='))).toBe(false)
 })
-test('unmanaged CLI dump uses native profiles and implies detachment', async () => {
-  const result = await cli('pro.x.com', '--app', '--unmanaged', '--dump', '--executable-file', Bun.argv[0])
+test('background CLI dump keeps a managed, temporary profile', async () => {
+  for (const flag of ['--background', '-b']) {
+    const result = await cli('example.com', flag, '--dump', '--executable-file', Bun.argv[0])
+    expect(result.code).toBe(0)
+    const dump = JSON.parse(result.stdout) as {
+      args: Array<string>
+      background: boolean
+      detached: boolean
+      temporary: boolean
+    }
+    expect(dump.background).toBe(true)
+    expect(dump.detached).toBe(false)
+    expect(dump.temporary).toBe(true)
+    expect(dump.args).toContain('--disable-background-mode')
+  }
+})
+test('detached CLI dump uses native profiles without a worker', async () => {
+  for (const flag of ['--detached', '-d']) {
+    const result = await cli('pro.x.com', '--app', flag, '--dump', '--executable-file', Bun.argv[0])
+    expect(result.code).toBe(0)
+    const dump = JSON.parse(result.stdout) as {
+      args: Array<string>
+      background: boolean
+      detached: boolean
+      temporary: boolean
+    }
+    expect(dump.detached).toBe(true)
+    expect(dump.background).toBe(false)
+    expect(dump.temporary).toBe(false)
+    expect(dump.args).toEqual(['--new-window', '--profile-directory=Default', '--app=https://pro.x.com/'])
+  }
+})
+test('detached CLI passes an explicitly requested debugging port without management flags', async () => {
+  const result = await cli('about:blank', '--detached', '--port', '9223', '--dump', '--executable-file', Bun.argv[0])
   expect(result.code).toBe(0)
   const dump = JSON.parse(result.stdout) as {
     args: Array<string>
     detached: boolean
-    temporary: boolean
-    unmanaged: boolean
   }
-  expect(dump.unmanaged).toBe(true)
   expect(dump.detached).toBe(true)
-  expect(dump.temporary).toBe(false)
-  expect(dump.args).toEqual(['--new-window', '--profile-directory=Default', '--app=https://pro.x.com/'])
-})
-test('unmanaged CLI passes an explicitly requested debugging port without management flags', async () => {
-  const result = await cli('about:blank', '--unmanaged', '--port', '9223', '--dump', '--executable-file', Bun.argv[0])
-  expect(result.code).toBe(0)
-  const dump = JSON.parse(result.stdout) as {
-    args: Array<string>
-    unmanaged: boolean
-  }
-  expect(dump.unmanaged).toBe(true)
   expect(dump.args).toContain('--remote-debugging-port=9223')
   expect(dump.args).not.toContain('--disable-background-mode')
   expect(dump.args.some(arg => arg.startsWith('--user-data-dir='))).toBe(false)

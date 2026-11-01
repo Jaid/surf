@@ -1,10 +1,10 @@
 import {BrowserSession} from './browser/BrowserSession.ts'
 
 export {BrowserSession} from './browser/BrowserSession.ts'
+export {launchBackground} from './browser/launchBackground.ts'
+export type {BackgroundInfo} from './browser/launchBackground.ts'
 export {launchDetached} from './browser/launchDetached.ts'
-export type {DetachedInfo} from './browser/launchDetached.ts'
-export {launchUnmanaged} from './browser/launchUnmanaged.ts'
-export type {UnmanagedInfo, UnmanagedLaunchOptions} from './browser/launchUnmanaged.ts'
+export type {DetachedInfo, DetachedLaunchOptions} from './browser/launchDetached.ts'
 export {normalizeUrl} from './browser/options.ts'
 export type {LaunchOptions} from './browser/options.ts'
 export {resolveExecutable} from './browser/resolveExecutable.ts'

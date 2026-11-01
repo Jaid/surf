@@ -1,58 +1,59 @@
-import type {LaunchOptions} from './options.ts'
+import type {LaunchOptions, ResolvedLaunchOptions} from './options.ts'
 
-import {join} from 'forward-slash-path'
 import fs from 'fs-extra'
 
-import {StopRequest} from '../lib/StopRequest.ts'
 import {spawnDetached} from '../process/spawnDetached.ts'
-import {resolveOptions} from './options.ts'
+import {performanceArguments, resolveOptions} from './options.ts'
 import {resolveExecutable} from './resolveExecutable.ts'
+
+export type DetachedLaunchOptions = Omit<LaunchOptions, 'betterIcon' | 'cacheFolder' | 'timeout'>
+
+export const resolveDetachedOptions = (input: DetachedLaunchOptions = {}) => {
+  // Also reject incompatible options from JavaScript callers rather than ignoring them.
+  const options = input as LaunchOptions
+  if (options.printLog?.length) {
+    throw new Error('--print-log requires a coupled browser.')
+  }
+  if (options.betterIcon) {
+    throw new Error('Detached launches do not support --better-icon. Use a managed session instead.')
+  }
+  return resolveOptions(input)
+}
+
+export const detachedArguments = (options: ResolvedLaunchOptions, enableDebugging = false) => [
+  '--new-window',
+  ...options.userDataDir ? [`--user-data-dir=${options.userDataDir}`] : [],
+  `--profile-directory=${options.profile}`,
+  ...enableDebugging ? [`--remote-debugging-port=${options.port}`, '--remote-debugging-address=127.0.0.1'] : [],
+  ...performanceArguments(options),
+  ...options.args,
+  ...options.kiosk ? ['--kiosk'] : [],
+  options.app ? `--app=${options.url}` : options.url,
+]
 
 export type DetachedInfo = {
   executable: string
-  logFile: string
-  pid: number
-  temporary: boolean
+  mode: 'detached'
+  spawnedPid: number
+  temporary: false
   url: string
-  userDataDir: string
-  webSocketDebuggerUrl: string
+  userDataDir?: string
 }
 
-export const launchDetached = async (input: LaunchOptions = {}): Promise<DetachedInfo> => {
-  const options = resolveOptions(input)
-  if (options.printLog.length) {
-    throw new Error('--print-log requires a coupled browser.')
+/** Submit a launch request; Chromium may hand it off to an existing browser. */
+export const launchDetached = async (input: DetachedLaunchOptions = {}): Promise<DetachedInfo> => {
+  const options = resolveDetachedOptions(input)
+  const executable = await resolveExecutable(options.executableFile)
+  if (options.userDataDir) {
+    await fs.mkdir(options.userDataDir, {recursive: true})
   }
-  options.executableFile = await resolveExecutable(options.executableFile)
-  const folder = join(options.cacheFolder, 'sessions', crypto.randomUUID())
-  await fs.mkdir(folder, {recursive: true})
-  const config = join(folder, 'options.json')
-  const status = join(folder, 'status.json')
-  await Bun.write(config, JSON.stringify(options))
-  using stop = new StopRequest
-  try {
-    const command = [process.execPath, join(import.meta.dir, 'worker.ts'), folder]
-    await spawnDetached(command)
-    const deadline = Date.now() + options.timeout + 60_000
-    while (Date.now() < deadline && stop.code === undefined) {
-      if (await Bun.file(status).exists()) {
-        const result = await Bun.file(status).json() as {
-          error?: string
-          info?: DetachedInfo
-        }
-        if (result.error) {
-          throw new Error(result.error)
-        }
-        if (result.info) {
-          return result.info
-        }
-      }
-      await Bun.sleep(50)
-    }
-    throw new Error(stop.code !== undefined ? 'Detached launch cancelled.' : `Detached worker did not become ready. See ${join(folder, 'session.log')}`)
-  } catch (error) {
-    await Bun.write(join(folder, 'stop'), '')
-    await fs.rm(config, {force: true})
-    throw error
+  const spawnedPid = await spawnDetached([executable, ...detachedArguments(options, input.port !== undefined)])
+  return {
+    mode: 'detached',
+    executable,
+    spawnedPid,
+    temporary: false,
+    url: options.url,
+    userDataDir: options.userDataDir,
   }
 }

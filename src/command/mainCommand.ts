@@ -18,14 +18,15 @@ const mainCommand = defineCommand({
       short: 'e',
       description: 'Browser executable; otherwise BROWSER or auto-detection',
     },
+    background: {
+      type: Boolean,
+      short: 'b',
+      default: false,
+      description: 'Return after startup; a background worker owns the browser and cleanup',
+    },
     detached: {
       type: Boolean,
       short: 'd',
-      default: false,
-      description: 'Return after startup; a background worker owns cleanup',
-    },
-    unmanaged: {
-      type: Boolean,
       default: false,
       description: 'Spawn and exit without a worker; uses the browser’s normal data directory unless specified',
     },
@@ -42,7 +43,7 @@ const mainCommand = defineCommand({
     userDataDir: {
       type: String,
       short: 'u',
-      description: 'Persistent data directory; omitted means temporary, or browser default with --unmanaged',
+      description: 'Persistent data directory; omitted means temporary, or browser default with --detached',
     },
     profile: {
       type: String,
@@ -56,7 +57,7 @@ const mainCommand = defineCommand({
     },
     port: {
       type: Number,
-      description: 'Loopback CDP port; managed default 0, unmanaged disabled unless supplied',
+      description: 'Loopback CDP port; managed default 0, detached disabled unless supplied',
     },
     betterIcon: {
       type: Boolean,
@@ -65,7 +66,7 @@ const mainCommand = defineCommand({
     },
     cacheFolder: {
       type: String,
-      description: 'Cache for icons and detached session logs',
+      description: 'Cache for icons and background session logs',
     },
     timeout: {
       type: Number,

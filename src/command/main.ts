@@ -4,8 +4,8 @@ import type {CommandHandler} from '@clerc/core'
 import {temporaryFile} from 'tempy'
 
 import {BrowserSession} from '../browser/BrowserSession.ts'
-import {launchDetached} from '../browser/launchDetached.ts'
-import {launchUnmanaged, resolveUnmanagedOptions, unmanagedArguments} from '../browser/launchUnmanaged.ts'
+import {launchBackground} from '../browser/launchBackground.ts'
+import {detachedArguments, launchDetached, resolveDetachedOptions} from '../browser/launchDetached.ts'
 import {browserArguments, integer, resolveOptions} from '../browser/options.ts'
 import {resolveExecutable} from '../browser/resolveExecutable.ts'
 import {SurfControls} from '../controls/SurfControls.ts'
@@ -22,15 +22,18 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
   if (context.rawParsed.parameters.length > 1 || flags.url !== undefined && parameters.url !== undefined) {
     throw new Error('Supply one URL, either positionally or with --url.')
   }
-  if (flags.printLog.length && (flags.detached || flags.unmanaged)) {
-    throw new Error('--print-log requires a coupled browser, not --detached or --unmanaged.')
+  if (flags.background && flags.detached) {
+    throw new Error('Choose --background (supervised by a Surf worker) or --detached (no worker), not both.')
+  }
+  if (flags.printLog.length && (flags.background || flags.detached)) {
+    throw new Error('--print-log requires a coupled browser, not --background or --detached.')
   }
   const traceOutput = flags.trace === undefined ? undefined : traceOutputPaths(flags.trace || temporaryFile({extension: 'msgpack.br'})).path
-  if (flags.unmanaged && traceOutput) {
-    throw new Error('--trace cannot be combined with --unmanaged.')
-  }
   if (flags.detached && traceOutput) {
-    throw new Error('--trace cannot be combined with --detached. Use surf trace --port <port> to record a detached browser.')
+    throw new Error('--trace cannot be combined with --detached.')
+  }
+  if (flags.background && traceOutput) {
+    throw new Error('--trace cannot be combined with --background. Use surf trace --port <port> to record a background browser.')
   }
   if (!traceOutput && flags.tracePreset.length) {
     throw new Error('--trace-preset requires --trace.')
@@ -53,18 +56,18 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     url: flags.url ?? parameters.url,
     args: parameters.browserArguments,
   }
-  const options = flags.unmanaged ? resolveUnmanagedOptions(input) : resolveOptions(input)
+  const options = flags.detached ? resolveDetachedOptions(input) : resolveOptions(input)
   if (flags.dump) {
     const executable = await resolveExecutable(options.executableFile)
     console.log(JSON.stringify({
       executable,
-      args: flags.unmanaged ? unmanagedArguments(options, input.port !== undefined) : browserArguments({
+      args: flags.detached ? detachedArguments(options, input.port !== undefined) : browserArguments({
         ...options,
         args: flags.surfControls ? [...options.args, '--load-extension=<surf-controls-extension>'] : options.args,
       }, options.userDataDir ?? '<temporary-user-data-dir>'),
-      temporary: !flags.unmanaged && !options.userDataDir,
-      detached: flags.detached || flags.unmanaged,
-      unmanaged: flags.unmanaged,
+      temporary: !flags.detached && !options.userDataDir,
+      background: flags.background,
+      detached: flags.detached,
       betterIcon: options.betterIcon,
       printLog: options.printLog,
       navigateTo: options.printLog.length ? options.url : undefined,
@@ -80,12 +83,12 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
     }, null, 2))
     return
   }
-  if (flags.unmanaged) {
-    console.log(JSON.stringify(await launchUnmanaged(input)))
+  if (flags.detached) {
+    console.log(JSON.stringify(await launchDetached(input)))
     return
   }
-  if (flags.detached) {
-    console.log(JSON.stringify(await launchDetached(options)))
+  if (flags.background) {
+    console.log(JSON.stringify(await launchBackground(options)))
     return
   }
   requireTraceInput(flags)
