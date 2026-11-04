@@ -4,7 +4,7 @@ import {join} from 'forward-slash-path'
 import fs from 'fs-extra'
 
 export class UserData {
-  static async create(path?: string) {
+  static async create(path?: string, profile = 'Default') {
     const temporary = path === undefined
     const rawFolder = path ?? await fs.mkdtemp(join(tmpdir(), 'surf-'))
     const folder = rawFolder.replaceAll('\\', '/')
@@ -24,6 +24,13 @@ export class UserData {
             throw error
           }
         })
+      }
+      if (temporary) {
+        // Passwords saved into a throwaway profile would be deleted with it, so the save prompt is just noise.
+        await fs.mkdir(join(folder, profile))
+        await fs.writeFile(join(folder, profile, 'Preferences'), JSON.stringify({
+          credentials_enable_service: false,
+        }), {flag: 'wx'})
       }
       return data
     } catch (error) {

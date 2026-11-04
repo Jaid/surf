@@ -15,7 +15,7 @@ export class BrowserSession {
   static async launch(input: LaunchOptions = {}) {
     const options = resolveOptions(input)
     const executable = await resolveExecutable(options.executableFile)
-    const userData = await UserData.create(options.userDataDir)
+    const userData = await UserData.create(options.userDataDir, options.profile)
     const args = browserArguments(options, userData.path)
     let browser: Browser | undefined
     let log: BrowserLog | undefined

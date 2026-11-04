@@ -11,7 +11,7 @@ Coupled (default) and `--background` sessions are *managed*: Surf owns the brows
 
 **Managed sessions:** A data directory must not already be open in another browser process, including another Surf session. Surf requires an independently owned process: it does not attach to or close your everyday browser. Chromium itself enforces profile exclusivity; a handoff to an existing process is treated as a failed launch. Recent Chrome also refuses remote debugging with its default everyday data directory; use a dedicated directory.
 
-Existing profile files are not rewritten by Surf. Empty/new managed directories receive a small Brave P3A opt-out `Local State`; subsequent preference updates belong to the browser.
+Existing profile files are not rewritten by Surf. Empty/new managed directories receive a small Brave P3A opt-out `Local State`; subsequent preference updates belong to the browser. Temporary profiles additionally turn off “Offer to save passwords” (`credentials_enable_service`), since anything saved would be deleted with the profile; persistent directories keep the browser default.
 
 Normal shutdown is graceful, with a process-tree termination fallback after 10 seconds if the browser is stuck. OS crashes, force-killing Surf, and power loss can leave temporary profiles behind. Do not delete a profile while its browser is running.
 

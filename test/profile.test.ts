@@ -18,14 +18,22 @@ test('throwaway profiles are seeded and removed', async () => {
     enabled: false,
     notice_acknowledged: true,
   }}})
+  expect(await Bun.file(join(data.path, 'Default/Preferences')).json()).toEqual({credentials_enable_service: false})
   await data.dispose()
   expect(await fs.stat(data.path).catch(() => null)).toBeNull()
+  await data.dispose()
+})
+test('throwaway profiles disable password saving in the selected profile directory', async () => {
+  const data = await UserData.create(undefined, 'Profile 2')
+  expect(await Bun.file(join(data.path, 'Profile 2/Preferences')).json()).toEqual({credentials_enable_service: false})
+  expect(await Bun.file(join(data.path, 'Default/Preferences')).exists()).toBe(false)
   await data.dispose()
 })
 test('explicit new directories are kept', async () => {
   const path = join(root, 'new profile')
   const data = await UserData.create(path)
   expect(data.temporary).toBe(false)
+  expect(await Bun.file(join(path, 'Default/Preferences')).exists()).toBe(false)
   await data.dispose()
   const info = await fs.stat(path)
   expect(info.isDirectory()).toBe(true)
