@@ -14,6 +14,9 @@ export const resolveDetachedOptions = (input: DetachedLaunchOptions = {}) => {
   if (options.printLog?.length) {
     throw new Error('--print-log requires a coupled browser.')
   }
+  if (options.grant?.length) {
+    throw new Error('--grant requires a managed session, since permissions are granted over CDP.')
+  }
   if (options.betterIcon) {
     throw new Error('Detached launches do not support --better-icon. Use a managed session instead.')
   }

@@ -6,7 +6,7 @@ import {temporaryFile} from 'tempy'
 import {BrowserSession} from '../browser/BrowserSession.ts'
 import {launchBackground} from '../browser/launchBackground.ts'
 import {detachedArguments, launchDetached, resolveDetachedOptions} from '../browser/launchDetached.ts'
-import {browserArguments, integer, resolveOptions} from '../browser/options.ts'
+import {browserArguments, defersNavigation, integer, resolveOptions} from '../browser/options.ts'
 import {resolveExecutable} from '../browser/resolveExecutable.ts'
 import {SurfControls} from '../controls/SurfControls.ts'
 import {StopRequest} from '../lib/StopRequest.ts'
@@ -70,7 +70,8 @@ export const run: CommandHandler<typeof mainCommand> = async context => {
       detached: flags.detached,
       betterIcon: options.betterIcon,
       printLog: options.printLog,
-      navigateTo: options.printLog.length ? options.url : undefined,
+      grant: options.grant,
+      navigateTo: defersNavigation(options) ? options.url : undefined,
       trace: traceOutput,
       tracePerfetto: traceOutput ? traceOutputPaths(traceOutput).perfettoPath : undefined,
       traceCategories,

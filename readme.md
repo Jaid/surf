@@ -102,6 +102,14 @@ Every managed session has a loopback CDP endpoint. `--port 0` (default) selects 
 surf localhost:5173 --port 9222 --background
 ```
 
+`--grant` pre-answers permission prompts for the URL’s origin, which is handy because throwaway profiles forget “Remember my decision” choices. For example, a public site sending telemetry to `*.lan` hosts needs Chromium’s Local Network Access permission:
+
+```powershell
+surf slop.gallery --app --grant local-network
+```
+
+Use web permission names as accepted by `navigator.permissions.query()`, like `local-network` (other devices on the local network), `loopback-network` (localhost), `notifications` or `camera`; repeat the flag to combine them. Grants apply to the launch URL’s origin only and last for the browser session. Surf opens a placeholder page first, grants over CDP, then navigates, so even the first requests are allowed. It requires a managed session and an HTTP(S) URL; library options accept `grant: ['local-network']`.
+
 CDP grants full control over the session. Do not expose its port outside loopback or use it with a profile whose data you do not want local debugging clients to access.
 
 ## tracing
@@ -316,7 +324,7 @@ The repeatable array accepts `console` and `network`; duplicates are removed and
 
 All selected events go to **stdout**, including console errors. Surf's own status/errors stay on stderr; the existing launch-info JSON is also on stdout, so opting into logging makes stdout a mixed human-readable stream. Terminal control characters in page messages are escaped.
 
-Logging follows the first page and its CDP-reported frame traffic across navigation; `surf trace --target-id` selects another page. It does not separately attach to other tabs, workers, or out-of-process iframe targets. When launching, Surf starts at `about:blank` (`data:,` with `--app`, since Chromium only opens app windows for web URLs), enables logging, then navigates to your URL so initial navigation and startup messages are captured. `--dump` shows this initial argument and the final `navigateTo` URL. Attachment only observes requests from that point onward; Chromium may replay buffered console messages when enabled.
+Logging follows the first page and its CDP-reported frame traffic across navigation; `surf trace --target-id` selects another page. It does not separately attach to other tabs, workers, or out-of-process iframe targets. When launching, Surf starts at `about:blank` (`data:,` with `--app`, since Chromium only opens app windows for web URLs), enables logging, then navigates to your URL so initial navigation and startup messages are captured (`--grant` uses the same deferred navigation). `--dump` shows this initial argument and the final `navigateTo` URL. Attachment only observes requests from that point onward; Chromium may replay buffered console messages when enabled.
 
 Printing is independent of trace categories: excluding `surf.console` does not disable console printing, and printing does not enable trace collectors. Logging continues while traces finalize/save and between repeated recordings.
 

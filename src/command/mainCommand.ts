@@ -59,6 +59,10 @@ const mainCommand = defineCommand({
       type: Number,
       description: 'Loopback CDP port; managed default 0, detached disabled unless supplied',
     },
+    grant: {
+      type: [String],
+      description: 'Grant a permission like local-network to the URL’s origin before loading; repeat to combine',
+    },
     betterIcon: {
       type: Boolean,
       default: false,

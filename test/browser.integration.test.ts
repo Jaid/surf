@@ -26,6 +26,23 @@ integration('real browser lifecycle removes only throwaway data', async () => {
   }
   expect(await fs.stat(path).catch(() => null)).toBeNull()
 }, 30_000)
+integration('granted permissions are in place before the page’s first script runs', async () => {
+  using server = Bun.serve({
+    port: 0,
+    hostname: '127.0.0.1',
+    fetch: () => new Response('<script>document.title = Notification.permission</script>', {headers: {'content-type': 'text/html'}}),
+  })
+  await using session = await BrowserSession.launch({
+    executableFile,
+    url: server.url.href,
+    grant: ['notifications'],
+    args: ['--headless=new'],
+  })
+  const target = await session.browser.waitForTarget(candidate => candidate.url().startsWith(server.url.origin))
+  const page = await target.page()
+  await page!.waitForFunction('document.title !== ""')
+  expect(await page!.title()).toBe('granted')
+}, 30_000)
 integration('persistent profile survives and duplicate launch does not own the original browser', async () => {
   const userDataDir = await fs.mkdtemp(join(tmpdir(), 'surf-persistent-test-'))
   try {

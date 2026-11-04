@@ -68,13 +68,6 @@ export class BrowserLog {
 
   private constructor(readonly categories: ReadonlyArray<PrintLogCategory>) {}
 
-  async navigate(url: string) {
-    if (!this.session) {
-      throw new Error('Cannot navigate without an attached logging session.')
-    }
-    await this.session.send('Page.navigate', {url})
-  }
-
   async [Symbol.asyncDispose]() {
     const session = this.session
     this.session = undefined

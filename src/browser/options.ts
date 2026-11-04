@@ -9,6 +9,7 @@ export type LaunchOptions = {
   betterIcon?: boolean
   cacheFolder?: string
   executableFile?: string
+  grant?: Array<string>
   kiosk?: boolean
   performance?: boolean
   port?: number
@@ -41,6 +42,18 @@ export const integer = (value: number, name: string, min: number, max = Number.M
   return value
 }
 
+export const resolveGrant = (permissions: ReadonlyArray<string> = [], url: string) => {
+  for (const permission of permissions) {
+    if (!/^[a-z]+(?:-[a-z]+)*$/.test(permission)) {
+      throw new Error(`Invalid permission name ${JSON.stringify(permission)}. Use web permission names like local-network or loopback-network.`)
+    }
+  }
+  if (permissions.length && !/^https?:/.test(url)) {
+    throw new Error('--grant requires an HTTP(S) URL, since permissions are granted to its origin.')
+  }
+  return [...new Set(permissions)]
+}
+
 // These switches would invalidate ownership, window mode, or endpoint discovery.
 const reservedArguments = /^(?:--?|\/)(?:user-data-dir|profile-directory|remote-debugging[^=]*|app|app-id|enable-background-mode|kiosk|new-window|no-startup-window|restore-last-session)(?:=|$)/i
 export const resolveOptions = (options: LaunchOptions = {}) => {
@@ -64,6 +77,7 @@ export const resolveOptions = (options: LaunchOptions = {}) => {
   return {
     ...options,
     printLog: resolvePrintLog(options.printLog),
+    grant: resolveGrant(options.grant, url),
     url,
     profile,
     app: options.app ?? false,
@@ -88,8 +102,17 @@ export const performanceArguments = (options: ResolvedLaunchOptions) => (options
   '--disable-renderer-backgrounding',
 ] : [])
 
+// Logging and permission grants must be in place before the page makes its first request.
+export const defersNavigation = (options: ResolvedLaunchOptions) => options.printLog.length > 0 || options.grant.length > 0
+
 // Chromium ignores --app for non-web-safe schemes like about: and opens a regular tabbed window instead.
 const appPlaceholderUrl = 'data:,'
+const initialUrl = (options: ResolvedLaunchOptions) => {
+  if (!defersNavigation(options)) {
+    return options.url
+  }
+  return options.app ? appPlaceholderUrl : 'about:blank'
+}
 
 export const browserArguments = (options: ResolvedLaunchOptions, userDataDir: string) => [
   '--no-first-run',
@@ -103,5 +126,5 @@ export const browserArguments = (options: ResolvedLaunchOptions, userDataDir: st
   ...performanceArguments(options),
   ...options.args,
   ...options.kiosk ? ['--kiosk'] : [],
-  options.app ? `--app=${options.printLog.length ? appPlaceholderUrl : options.url}` : (options.printLog.length ? 'about:blank' : options.url),
+  options.app ? `--app=${initialUrl(options)}` : initialUrl(options),
 ]

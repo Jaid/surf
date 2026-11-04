@@ -52,6 +52,31 @@ test('validates lifecycle switches and numeric boundaries', () => {
     expect(() => resolveOptions({profile})).toThrow()
   }
 })
+test('permission grants defer navigation to the URL’s origin', () => {
+  const options = resolveOptions({
+    url: 'example.com',
+    grant: ['local-network', 'loopback-network', 'local-network'],
+  })
+  expect(options.grant).toEqual(['local-network', 'loopback-network'])
+  expect(browserArguments(options, 'profile').at(-1)).toBe('about:blank')
+  expect(browserArguments({
+    ...options,
+    app: true,
+  }, 'profile').at(-1)).toBe('--app=data:,')
+  expect(browserArguments(resolveOptions({url: 'example.com'}), 'profile').at(-1)).toBe('https://example.com/')
+  for (const grant of [['Local-Network'], ['local_network'], [''], ['-local']]) {
+    expect(() => resolveOptions({
+      url: 'example.com',
+      grant,
+    })).toThrow('Invalid permission name')
+  }
+  for (const url of ['about:blank', 'file:///C:/test.html', 'data:,']) {
+    expect(() => resolveOptions({
+      url,
+      grant: ['local-network'],
+    })).toThrow('HTTP(S) URL')
+  }
+})
 test('home expansion and Windows argument quoting', () => {
   expect(resolvePath('~/surf')).toBe(`${homedir().replaceAll('\\', '/')}/surf`)
   expect(quoteWindowsArgument('')).toBe('""')

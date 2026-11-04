@@ -81,6 +81,9 @@ test('invalid inputs fail without launching', async () => {
     ['trace', '--trace-preset'],
     ['--detached', '--trace', 'out.msgpack.br'],
     ['--detached', '--app', '--better-icon'],
+    ['--detached', '--grant', 'local-network', 'example.com'],
+    ['--grant', 'local-network', 'about:blank'],
+    ['--grant', 'Local_Network', 'example.com'],
     ['--detached', '--port', '-1'],
     ['--unmanaged'],
     ['--', '--user-data-dir=elsewhere'],
@@ -238,4 +241,18 @@ test('print-log is repeatable, independent of tracing, and initializes before na
   expect(dump.navigateTo).toBe('https://example.com/')
   const help = await cli('trace', '--help')
   expect(help.stdout).toContain('--print-log')
+})
+test('grant is repeatable and initializes before navigation', async () => {
+  const result = await cli('--dump', '--executable-file', Bun.argv[0], 'example.com:8443/app', '--grant', 'local-network', '--grant', 'loopback-network', '--grant', 'local-network')
+  expect(result.code).toBe(0)
+  const dump = JSON.parse(result.stdout) as {
+    args: Array<string>
+    grant: Array<string>
+    navigateTo: string
+  }
+  expect(dump.grant).toEqual(['local-network', 'loopback-network'])
+  expect(dump.args.at(-1)).toBe('about:blank')
+  expect(dump.navigateTo).toBe('https://example.com:8443/app')
+  const help = await cli('--help')
+  expect(help.stdout).toContain('--grant')
 })

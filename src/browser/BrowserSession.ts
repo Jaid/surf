@@ -6,7 +6,8 @@ import {join} from 'forward-slash-path'
 import puppeteer from 'puppeteer-core'
 
 import {BrowserLog} from '../log/BrowserLog.ts'
-import {browserArguments, resolveOptions} from './options.ts'
+import {navigateInitialPage} from './navigateInitialPage.ts'
+import {browserArguments, defersNavigation, resolveOptions} from './options.ts'
 import {resolveExecutable} from './resolveExecutable.ts'
 import {UserData} from './UserData.ts'
 
@@ -33,10 +34,19 @@ export class BrowserSession {
         handleSIGHUP: false,
       })
       const session = new BrowserSession(browser, userData, options, executable, args)
+      if (options.grant.length) {
+        const {origin} = new URL(options.url)
+        await browser.setPermission(origin, ...options.grant.map(name => ({
+          permission: {name},
+          state: 'granted' as const,
+        })))
+      }
       if (options.printLog.length) {
         log = await BrowserLog.attach(browser, options.printLog)
         session.log = log
-        await log.navigate(options.url)
+      }
+      if (defersNavigation(options)) {
+        await navigateInitialPage(browser, options.url)
       }
       if (options.betterIcon) {
         try {
