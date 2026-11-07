@@ -43,18 +43,33 @@ integration('granted permissions are in place before the page’s first script r
   await page!.waitForFunction('document.title !== ""')
   expect(await page!.title()).toBe('granted')
 }, 30_000)
-integration('closing the session gives pages their pagehide, so its keepalive requests still arrive', async () => {
+/** Closes a session whose page sends a keepalive request on pagehide and returns what the collector received. */
+async function closeWithExitRequest() {
   const exits: Array<string> = []
-  using server = Bun.serve({
+  // Like telemetry to a collector: cross-origin JSON, so the request waits for a CORS preflight first.
+  const cors = {
+    'access-control-allow-origin': '*',
+    'access-control-allow-headers': 'content-type',
+  }
+  using collector = Bun.serve({
     port: 0,
     hostname: '127.0.0.1',
     fetch: async request => {
       if (request.method === 'POST') {
         exits.push(await request.text())
-        return new Response(null, {status: 204})
+      } else {
+        await Bun.sleep(150)
       }
-      return new Response('<script>addEventListener("pagehide", () => fetch("/exit", {method: "POST", body: "pagehide", keepalive: true}))</script>', {headers: {'content-type': 'text/html'}})
+      return new Response(null, {
+        status: 204,
+        headers: cors,
+      })
     },
+  })
+  using server = Bun.serve({
+    port: 0,
+    hostname: '127.0.0.1',
+    fetch: () => new Response(`<script>addEventListener("pagehide", () => fetch(${JSON.stringify(collector.url.href)}, {method: "POST", body: "pagehide", headers: {"content-type": "application/json"}, keepalive: true}))</script>`, {headers: {'content-type': 'text/html'}}),
   })
   const session = await BrowserSession.launch({
     executableFile,
@@ -64,7 +79,11 @@ integration('closing the session gives pages their pagehide, so its keepalive re
   const target = await session.browser.waitForTarget(candidate => candidate.url().startsWith(server.url.origin))
   await (await target.page())!.waitForNetworkIdle()
   await session.close()
-  expect(exits).toEqual(['pagehide'])
+  await Bun.sleep(500)
+  return exits
+}
+integration('closing the session gives pages their pagehide, so its keepalive requests still arrive', async () => {
+  expect(await closeWithExitRequest()).toEqual(['pagehide'])
 }, 30_000)
 integration('persistent profile survives and duplicate launch does not own the original browser', async () => {
   const userDataDir = await fs.mkdtemp(join(tmpdir(), 'surf-persistent-test-'))

@@ -11,6 +11,9 @@ import {browserArguments, defersNavigation, resolveOptions} from './options.ts'
 import {resolveExecutable} from './resolveExecutable.ts'
 import {UserData} from './UserData.ts'
 
+/** how long closed pages get to send their last requests before the browser shuts down */
+const pageExitGraceMs = 1000
+
 export class BrowserSession {
   static async launch(input: LaunchOptions = {}) {
     const options = resolveOptions(input)
@@ -118,7 +121,12 @@ export class BrowserSession {
       return
     }
     const pages = await this.browser.pages().catch(() => [])
+    if (!pages.length) {
+      return
+    }
     await Promise.allSettled(pages.map(page => page.close()))
+    // Keepalive requests outlive their tab in the network service, where CDP cannot watch them, and Browser.close would cut them off, even while they wait for a CORS preflight.
+    await Bun.sleep(pageExitGraceMs)
   }
 
   private async dispose() {
