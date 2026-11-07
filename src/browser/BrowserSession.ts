@@ -112,8 +112,19 @@ export class BrowserSession {
     await this.close()
   }
 
+  /** Closes every tab the way a user would. Browser.close alone ends the renderers without pagehide, so pages could not send their last keepalive requests. */
+  private async closePages() {
+    if (!this.browser.connected) {
+      return
+    }
+    const pages = await this.browser.pages().catch(() => [])
+    await Promise.allSettled(pages.map(page => page.close()))
+  }
+
   private async dispose() {
     try {
+      // Before the log goes away, so it still prints what the pages send while closing.
+      await this.closePages()
       await this.log?.[Symbol.asyncDispose]()
       await this.icon?.[Symbol.asyncDispose]()
     } finally {

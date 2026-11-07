@@ -43,6 +43,29 @@ integration('granted permissions are in place before the page’s first script r
   await page!.waitForFunction('document.title !== ""')
   expect(await page!.title()).toBe('granted')
 }, 30_000)
+integration('closing the session gives pages their pagehide, so its keepalive requests still arrive', async () => {
+  const exits: Array<string> = []
+  using server = Bun.serve({
+    port: 0,
+    hostname: '127.0.0.1',
+    fetch: async request => {
+      if (request.method === 'POST') {
+        exits.push(await request.text())
+        return new Response(null, {status: 204})
+      }
+      return new Response('<script>addEventListener("pagehide", () => fetch("/exit", {method: "POST", body: "pagehide", keepalive: true}))</script>', {headers: {'content-type': 'text/html'}})
+    },
+  })
+  const session = await BrowserSession.launch({
+    executableFile,
+    url: server.url.href,
+    args: ['--headless=new'],
+  })
+  const target = await session.browser.waitForTarget(candidate => candidate.url().startsWith(server.url.origin))
+  await (await target.page())!.waitForNetworkIdle()
+  await session.close()
+  expect(exits).toEqual(['pagehide'])
+}, 30_000)
 integration('persistent profile survives and duplicate launch does not own the original browser', async () => {
   const userDataDir = await fs.mkdtemp(join(tmpdir(), 'surf-persistent-test-'))
   try {
